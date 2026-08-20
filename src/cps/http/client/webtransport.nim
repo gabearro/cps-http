@@ -1,7 +1,7 @@
 ## WebTransport client adapter.
 
-import ../../runtime
-import ../../transform
+import cps/runtime
+import cps/transform
 import ../shared/webtransport as wt_shared
 
 proc openWebTransportSession*(authority: string,

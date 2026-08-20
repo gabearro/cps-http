@@ -1,17 +1,17 @@
 ## HTTP/3 client adapter.
 
 import std/[strutils, os, tables, times]
-import ../../runtime
-import ../../transform
-import ../../eventloop
+import cps/runtime
+import cps/transform
+import cps/eventloop
 import ../shared/http3
 import ../shared/qpack
 import ../shared/http3_connection
 import ../shared/masque as masque_shared
-import ../../quic/endpoint
-import ../../quic/connection
-import ../../quic/streams
-import ../../quic/types
+import cps/quic/endpoint
+import cps/quic/connection
+import cps/quic/streams
+import cps/quic/types
 
 type
   Http3ProtocolError* = object of ValueError

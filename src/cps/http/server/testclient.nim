@@ -4,9 +4,9 @@
 ## handlers directly — no TCP, no HTTP parsing. Fast for unit tests.
 
 import std/[tables, strutils, json]
-import ../../runtime
-import ../../transform
-import ../../eventloop
+import cps/runtime
+import cps/transform
+import cps/eventloop
 import ./types
 import ./router
 

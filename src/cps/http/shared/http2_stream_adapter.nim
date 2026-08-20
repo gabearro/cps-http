@@ -8,9 +8,9 @@
 ## Write: data → connection-scoped HTTP/2 writer callback
 ## Read: internal buffer fed by processServerFrame via feedData()
 
-import ../../runtime
-import ../../transform
-import ../../io/streams
+import cps/runtime
+import cps/transform
+import cps/io/streams
 
 type
   AdapterSendHeadersProc* = proc(streamId: uint32, statusCode: int,

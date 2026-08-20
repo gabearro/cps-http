@@ -1,7 +1,7 @@
 ## WebTransport session primitives over HTTP/3 extended CONNECT.
 
 import std/strutils
-import ../../quic/varint
+import cps/quic/varint
 import ./qpack
 
 const

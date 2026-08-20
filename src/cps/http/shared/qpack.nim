@@ -1,6 +1,6 @@
 ## QPACK encoder/decoder (RFC 9204-oriented baseline).
 
-import ../../quic/varint
+import cps/quic/varint
 import ./hpack
 
 type

@@ -5,9 +5,9 @@
 ## the CPS HTTP server.
 
 import std/[tables, strutils, os, uri, json, algorithm, times, base64, atomics]
-import ../../runtime
-import ../../eventloop
-import ../../io/files
+import cps/runtime
+import cps/eventloop
+import cps/io/files
 import ./types
 import ../shared/compression
 

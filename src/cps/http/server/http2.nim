@@ -4,12 +4,12 @@
 ## and connection-scoped serialized writes.
 
 import std/[strutils, tables, deques]
-import ../../runtime
-import ../../transform
-import ../../eventloop
-import ../../concurrency/taskgroup
-import ../../io/streams
-import ../../io/buffered
+import cps/runtime
+import cps/transform
+import cps/eventloop
+import cps/concurrency/taskgroup
+import cps/io/streams
+import cps/io/buffered
 import ../shared/hpack
 import ../shared/http2
 import ./types

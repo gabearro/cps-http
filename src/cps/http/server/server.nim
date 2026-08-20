@@ -2,21 +2,21 @@
 ##
 ## Server accept loop, graceful shutdown, and convenience serve() proc.
 
-import ../../runtime
-import ../../transform
-import ../../eventloop
+import cps/runtime
+import cps/transform
+import cps/eventloop
 when defined(posix):
-  import ../../concurrency/signals
-import ../../concurrency/taskgroup
+  import cps/concurrency/signals
+import cps/concurrency/taskgroup
 import std/[nativesockets, tables, strutils, os, net]
-import ../../private/platform
-import ../../io/streams
-import ../../io/tcp
-import ../../tls/server as tls_server
-import ../../quic/endpoint as quic_endpoint
-import ../../quic/connection as quic_connection
-import ../../quic/streams as quic_streams
-import ../../quic/types as quic_types
+import cps/private/platform
+import cps/io/streams
+import cps/io/tcp
+import cps/tls/server as tls_server
+import cps/quic/endpoint as quic_endpoint
+import cps/quic/connection as quic_connection
+import cps/quic/streams as quic_streams
+import cps/quic/types as quic_types
 import ./types
 import ./http1
 import ./http2

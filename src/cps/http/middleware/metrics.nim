@@ -2,7 +2,7 @@
 ## Tracks request counts and latency by method, path pattern, and status code.
 
 import std/[tables, strutils, times, locks]
-import ../../runtime
+import cps/runtime
 import ../server/types
 import ../server/router
 

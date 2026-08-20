@@ -3,14 +3,14 @@
 ## Client-side WebSocket connection establishment over plain TCP and TLS.
 
 import std/[strutils, sysrand, base64]
-import ../../runtime
-import ../../transform
-import ../../io/streams
-import ../../io/buffered
-import ../../io/tcp
-import ../../io/proxy
-import ../../tls/client as tls
-import ../../tls/fingerprint
+import cps/runtime
+import cps/transform
+import cps/io/streams
+import cps/io/buffered
+import cps/io/tcp
+import cps/io/proxy
+import cps/tls/client as tls
+import cps/tls/fingerprint
 import ../shared/ws
 
 export ws

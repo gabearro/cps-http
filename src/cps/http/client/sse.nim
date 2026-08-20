@@ -11,15 +11,15 @@
 ##     echo event.eventType, ": ", event.data
 
 import std/strutils
-import ../../runtime
-import ../../transform
-import ../../io/streams
-import ../../io/buffered
-import ../../io/tcp
-import ../../io/proxy
-import ../../tls/client as tls
+import cps/runtime
+import cps/transform
+import cps/io/streams
+import cps/io/buffered
+import cps/io/tcp
+import cps/io/proxy
+import cps/tls/client as tls
 import ../shared/compression
-import ../../tls/fingerprint
+import cps/tls/fingerprint
 
 type
   SseEvent* = object

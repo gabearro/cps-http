@@ -14,9 +14,9 @@
 ##       respond 200, "User: " & userId
 
 import std/[macros, tables, strutils, json]
-import ../../runtime
-import ../../transform
-import ../../eventloop
+import cps/runtime
+import cps/transform
+import cps/eventloop
 import ./types
 import ./router
 import ./sse

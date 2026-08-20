@@ -4,13 +4,13 @@
 ## HttpHandler, HttpServerConfig, HttpServer.
 
 import std/[strutils, nativesockets, tables, json]
-import ../../private/platform
-import ../../runtime
-import ../../eventloop
-import ../../concurrency/taskgroup
-import ../../io/tcp
-import ../../io/streams
-import ../../io/buffered
+import cps/private/platform
+import cps/runtime
+import cps/eventloop
+import cps/concurrency/taskgroup
+import cps/io/tcp
+import cps/io/streams
+import cps/io/buffered
 
 type
   ResponseControl* = enum

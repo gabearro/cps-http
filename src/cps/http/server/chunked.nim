@@ -19,8 +19,8 @@
 ##     return streamResponse()
 
 import std/strutils
-import ../../runtime
-import ../../io/streams
+import cps/runtime
+import cps/io/streams
 import ./types
 import ../shared/http2_stream_adapter
 

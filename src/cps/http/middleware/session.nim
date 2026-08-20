@@ -11,7 +11,7 @@
 
 import std/[tables, strutils, json, base64]
 import checksums/sha1
-import ../../runtime
+import cps/runtime
 import ../server/types
 import ../server/router
 

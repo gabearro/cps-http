@@ -1,7 +1,7 @@
 ## WebTransport server adapter hooks.
 
-import ../../runtime
-import ../../transform
+import cps/runtime
+import cps/transform
 import ../shared/webtransport as wt_shared
 
 type

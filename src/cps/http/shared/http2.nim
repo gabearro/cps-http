@@ -6,13 +6,13 @@
 ## sequential async code.
 
 import std/[strutils, tables, deques]
-import ../../runtime
-import ../../transform
-import ../../eventloop
-import ../../io/streams
-import ../../io/buffered
+import cps/runtime
+import cps/transform
+import cps/eventloop
+import cps/io/streams
+import cps/io/buffered
 import ./hpack
-import ../../tls/fingerprint
+import cps/tls/fingerprint
 
 # ============================================================
 # HTTP/2 Frame Types (RFC 7540 section 6)

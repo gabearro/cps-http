@@ -1,7 +1,7 @@
 ## MASQUE server adapter hooks.
 
-import ../../runtime
-import ../../transform
+import cps/runtime
+import cps/transform
 import ../shared/masque as masque_shared
 
 type

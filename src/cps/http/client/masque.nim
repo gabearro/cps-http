@@ -1,7 +1,7 @@
 ## MASQUE client adapter.
 
-import ../../runtime
-import ../../transform
+import cps/runtime
+import cps/transform
 import ../shared/masque as masque_shared
 
 proc connectUdp*(authority: string, targetHostPort: string): CpsFuture[masque_shared.MasqueSession] {.cps.} =

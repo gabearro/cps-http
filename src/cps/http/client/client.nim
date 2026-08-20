@@ -13,20 +13,20 @@
 ##   echo resp.statusCode, " ", resp.body
 
 import std/[strutils, uri, tables, times, options, os]
-import ../../runtime
-import ../../transform
-import ../../eventloop
-import ../../io/tcp
-import ../../io/streams
-import ../../io/buffered
-import ../../io/proxy
-import ../../tls/client as tls
-import ../../quic/endpoint as quic_endpoint
+import cps/runtime
+import cps/transform
+import cps/eventloop
+import cps/io/tcp
+import cps/io/streams
+import cps/io/buffered
+import cps/io/proxy
+import cps/tls/client as tls
+import cps/quic/endpoint as quic_endpoint
 import ./http1
 import ./http3 as http3_client
 import ../shared/http2
 import ../shared/compression
-import ../../tls/fingerprint
+import cps/tls/fingerprint
 
 type
   HttpVersion* = enum

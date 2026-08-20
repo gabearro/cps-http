@@ -10,8 +10,8 @@
 
 import std/strutils
 import zippy
-import ../../runtime
-import ../../io/streams
+import cps/runtime
+import cps/io/streams
 
 type
   ContentEncoding* = enum

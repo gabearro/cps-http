@@ -4,9 +4,9 @@
 ## and HTTP/2 (Extended CONNECT, RFC 8441).
 
 import std/[strutils, tables, base64]
-import ../../runtime
-import ../../io/streams
-import ../../io/buffered
+import cps/runtime
+import cps/io/streams
+import cps/io/buffered
 import ../shared/ws
 import ./types
 import ../shared/http2_stream_adapter

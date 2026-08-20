@@ -5,10 +5,10 @@
 
 import std/[strutils, sysrand, base64, atomics, unicode]
 import checksums/sha1
-import ../../runtime
-import ../../transform
-import ../../io/streams
-import ../../io/buffered
+import cps/runtime
+import cps/transform
+import cps/io/streams
+import cps/io/buffered
 import ./compression
 
 # ============================================================

@@ -5,10 +5,10 @@
 ## Uses CPS procs with BufferedReader for simple, sequential async code.
 
 import std/[strutils]
-import ../../runtime
-import ../../transform
-import ../../io/streams
-import ../../io/buffered
+import cps/runtime
+import cps/transform
+import cps/io/streams
+import cps/io/buffered
 
 type
   HttpResponse* = object

@@ -1,7 +1,7 @@
 ## HTTP/3 connection/session state.
 
 import std/[tables, strutils, sets]
-import ../../quic/varint
+import cps/quic/varint
 import ./http3
 import ./qpack
 import ./webtransport

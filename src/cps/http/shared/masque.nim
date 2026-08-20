@@ -2,7 +2,7 @@
 
 import std/tables
 import std/strutils
-import ../../quic/varint
+import cps/quic/varint
 import ./qpack
 
 const

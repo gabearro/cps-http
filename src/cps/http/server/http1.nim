@@ -4,11 +4,11 @@
 ## Supports keep-alive connections and chunked/fixed-length bodies.
 
 import std/[strutils, tables]
-import ../../runtime
-import ../../transform
-import ../../io/streams
-import ../../io/buffered
-import ../../io/timeouts
+import cps/runtime
+import cps/transform
+import cps/io/streams
+import cps/io/buffered
+import cps/io/timeouts
 import ./types
 
 type

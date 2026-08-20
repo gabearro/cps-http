@@ -1,8 +1,8 @@
 ## HTTP/3 server adapter.
 
 import std/[strutils, tables]
-import ../../runtime
-import ../../transform
+import cps/runtime
+import cps/transform
 import ../shared/http3
 import ../shared/qpack
 import ../shared/http3_connection

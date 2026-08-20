@@ -1,7 +1,7 @@
 ## HTTP/3 frame codec (RFC 9114) built on QUIC varints.
 
 import std/[strutils, sets]
-import ../../quic/varint
+import cps/quic/varint
 
 const
   H3FrameData* = 0x00'u64

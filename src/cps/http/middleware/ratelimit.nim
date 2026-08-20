@@ -4,7 +4,7 @@
 ## Tracks requests per key (IP, API key, etc.) and returns 429 when exceeded.
 
 import std/[tables, times, locks, strutils]
-import ../../runtime
+import cps/runtime
 import ../server/types
 import ../server/router
 
