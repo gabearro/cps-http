@@ -9,6 +9,7 @@ requires "nim >= 2.0.0"
 requires "https://github.com/gabearro/cps-runtime == 1.0.0"
 requires "https://github.com/gabearro/cps-tls == 1.0.0"
 requires "https://github.com/gabearro/cps-quic == 1.0.0"
+requires "checksums >= 0.2.2"
 requires "zippy >= 0.10.0"
 
 task test, "Run the project test suite":
