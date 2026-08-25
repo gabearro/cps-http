@@ -1,0 +1,12 @@
+nimTitle	masque	cps/http/client/masque.html	module cps/http/client/masque		0
+nim	connectUdp	cps/http/client/masque.html#connectUdp,string,string	proc connectUdp(authority: string; targetHostPort: string): CpsFuture[MasqueSession]		7
+nim	connectIp	cps/http/client/masque.html#connectIp,string,string	proc connectIp(authority: string; targetIpPrefix: string): CpsFuture[MasqueSession]		11
+nim	buildConnectUdpHeaders	cps/http/client/masque.html#buildConnectUdpHeaders,string,string	proc buildConnectUdpHeaders(authority: string; targetHostPort: string): seq[\n    (string, string)]		15
+nim	buildConnectIpHeaders	cps/http/client/masque.html#buildConnectIpHeaders,string,string	proc buildConnectIpHeaders(authority: string; targetIpPrefix: string): seq[\n    (string, string)]		19
+nim	sendCapsule	cps/http/client/masque.html#sendCapsule,,uint64,openArray[byte]	proc sendCapsule(session: masque_shared.MasqueSession; capsuleType: uint64;\n            payload: openArray[byte])		23
+nim	recvCapsule	cps/http/client/masque.html#recvCapsule	proc recvCapsule(session: masque_shared.MasqueSession): masque_shared.MasqueCapsule		27
+nim	openDatagramContext	cps/http/client/masque.html#openDatagramContext,,string	proc openDatagramContext(session: masque_shared.MasqueSession; label: string = ""): uint64		31
+nim	sendDatagram	cps/http/client/masque.html#sendDatagram,,uint64,openArray[byte]	proc sendDatagram(session: masque_shared.MasqueSession; contextId: uint64;\n             payload: openArray[byte])		35
+nim	recvDatagram	cps/http/client/masque.html#recvDatagram	proc recvDatagram(session: masque_shared.MasqueSession): masque_shared.MasqueDatagram		39
+nim	encodeCapsuleWire	cps/http/client/masque.html#encodeCapsuleWire,uint64,openArray[byte]	proc encodeCapsuleWire(capsuleType: uint64; payload: openArray[byte]): seq[byte]		43
+nim	decodeMasqueDatagramWire	cps/http/client/masque.html#decodeMasqueDatagramWire,openArray[byte]	proc decodeMasqueDatagramWire(wire: openArray[byte]): masque_shared.MasqueDatagram		47

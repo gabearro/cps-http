@@ -1,0 +1,6 @@
+nimTitle	chunked	cps/http/server/chunked.html	module cps/http/server/chunked		0
+nim	ChunkedWriter	cps/http/server/chunked.html#ChunkedWriter	type ChunkedWriter		28
+nim	streamResponse	cps/http/server/chunked.html#streamResponse	proc streamResponse(): HttpResponseBuilder		33
+nim	initChunked	cps/http/server/chunked.html#initChunked,AsyncStream,int,seq[]	proc initChunked(stream: AsyncStream; statusCode: int = 200;\n            extraHeaders: seq[(string, string)] = @[]): CpsFuture[ChunkedWriter]		38
+nim	sendChunk	cps/http/server/chunked.html#sendChunk,ChunkedWriter,string	proc sendChunk(writer: ChunkedWriter; data: string): CpsVoidFuture		82
+nim	endChunked	cps/http/server/chunked.html#endChunked,ChunkedWriter	proc endChunked(writer: ChunkedWriter): CpsVoidFuture		106

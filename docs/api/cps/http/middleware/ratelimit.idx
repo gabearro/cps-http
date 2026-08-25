@@ -1,0 +1,6 @@
+nimTitle	ratelimit	cps/http/middleware/ratelimit.html	module cps/http/middleware/ratelimit		0
+nim	RateLimiter	cps/http/middleware/ratelimit.html#RateLimiter	type RateLimiter		16
+nim	newRateLimiter	cps/http/middleware/ratelimit.html#newRateLimiter,int,int,int,int,int	proc newRateLimiter(maxRequests: int; windowSeconds: int; maxKeys: int = 10000;\n               idleTtlSeconds: int = 600; cleanupIntervalSeconds: int = 60): RateLimiter		26
+nim	extractIp	cps/http/middleware/ratelimit.html#extractIp,HttpRequest	proc extractIp(req: HttpRequest): string		46
+nim	extractHeader	cps/http/middleware/ratelimit.html#extractHeader,string	proc extractHeader(headerName: string): proc (req: HttpRequest): string		50
+nim	rateLimitMiddleware	cps/http/middleware/ratelimit.html#rateLimitMiddleware,int,int,proc(HttpRequest),int,int,int	proc rateLimitMiddleware(maxRequests: int; windowSeconds: int;\n                    keyExtractor: proc (req: HttpRequest): string = nil;\n                    maxKeys: int = 10000; idleTtlSeconds: int = 600;\n                    cleanupIntervalSeconds: int = 60): Middleware		108

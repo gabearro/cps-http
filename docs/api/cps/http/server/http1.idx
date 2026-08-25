@@ -1,0 +1,6 @@
+nimTitle	http1	cps/http/server/http1.html	module cps/http/server/http1		0
+nim	Http1ServerConnection	cps/http/server/http1.html#Http1ServerConnection	object Http1ServerConnection		28
+nim	parseRequest	cps/http/server/http1.html#parseRequest,AsyncStream,BufferedReader,HttpServerConfig,string	proc parseRequest(stream: AsyncStream; reader: BufferedReader;\n             config: HttpServerConfig; remoteAddr: string = ""): CpsFuture[\n    HttpRequest]		2410
+nim	buildResponseString	cps/http/server/http1.html#buildResponseString,HttpResponseBuilder	proc buildResponseString(resp: HttpResponseBuilder): string		781
+nim	writeResponse	cps/http/server/http1.html#writeResponse,AsyncStream,HttpResponseBuilder,bool,int	proc writeResponse(stream: AsyncStream; resp: HttpResponseBuilder;\n              sendBody: bool = true; bodyLengthHint: int = -1): CpsVoidFuture		785
+nim	handleHttp1Connection	cps/http/server/http1.html#handleHttp1Connection,AsyncStream,HttpServerConfig,HttpHandler,string	proc handleHttp1Connection(stream: AsyncStream; config: HttpServerConfig;\n                      handler: HttpHandler; remoteAddr: string = ""): CpsVoidFuture		2410

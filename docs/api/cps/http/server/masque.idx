@@ -1,0 +1,7 @@
+nimTitle	masque	cps/http/server/masque.html	module cps/http/server/masque		0
+nim	MasquePolicyHook	cps/http/server/masque.html#MasquePolicyHook	type MasquePolicyHook		8
+nim	MasqueSessionHandler	cps/http/server/masque.html#MasqueSessionHandler	type MasqueSessionHandler		9
+nim	connectUdp	cps/http/server/masque.html#connectUdp,string,string,MasquePolicyHook,MasqueSessionHandler	proc connectUdp(authority: string; targetHostPort: string;\n           policyHook: MasquePolicyHook = nil;\n           handler: MasqueSessionHandler = nil): CpsFuture[MasqueSession]		2410
+nim	connectIp	cps/http/server/masque.html#connectIp,string,string,MasquePolicyHook,MasqueSessionHandler	proc connectIp(authority: string; targetIpPrefix: string;\n          policyHook: MasquePolicyHook = nil;\n          handler: MasqueSessionHandler = nil): CpsFuture[MasqueSession]		2410
+nim	parseConnectRequest	cps/http/server/masque.html#parseConnectRequest,openArray[]	proc parseConnectRequest(headers: openArray[(string, string)]): masque_shared.MasqueConnectRequest		35
+nim	isMasqueConnectRequest	cps/http/server/masque.html#isMasqueConnectRequest,openArray[]	proc isMasqueConnectRequest(headers: openArray[(string, string)]): bool		39

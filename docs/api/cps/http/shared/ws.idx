@@ -1,0 +1,34 @@
+nimTitle	ws	cps/http/shared/ws.html	module cps/http/shared/ws		0
+nim	WsMagicGuid	cps/http/shared/ws.html#WsMagicGuid	const WsMagicGuid		19
+nim	WsVersion	cps/http/shared/ws.html#WsVersion	const WsVersion		20
+nim	opContinuation	cps/http/shared/ws.html#opContinuation	WsOpcode.opContinuation		27
+nim	opText	cps/http/shared/ws.html#opText	WsOpcode.opText		27
+nim	opBinary	cps/http/shared/ws.html#opBinary	WsOpcode.opBinary		27
+nim	opClose	cps/http/shared/ws.html#opClose	WsOpcode.opClose		27
+nim	opPing	cps/http/shared/ws.html#opPing	WsOpcode.opPing		27
+nim	opPong	cps/http/shared/ws.html#opPong	WsOpcode.opPong		27
+nim	WsOpcode	cps/http/shared/ws.html#WsOpcode	enum WsOpcode		27
+nim	WsFrame	cps/http/shared/ws.html#WsFrame	object WsFrame		36
+nim	WsMessage	cps/http/shared/ws.html#WsMessage	object WsMessage		44
+nim	wsOpen	cps/http/shared/ws.html#wsOpen	WsState.wsOpen		49
+nim	wsClosing	cps/http/shared/ws.html#wsClosing	WsState.wsClosing		49
+nim	wsClosed	cps/http/shared/ws.html#wsClosed	WsState.wsClosed		49
+nim	WsState	cps/http/shared/ws.html#WsState	enum WsState		49
+nim	WebSocket	cps/http/shared/ws.html#WebSocket	type WebSocket		52
+nim	WsError	cps/http/shared/ws.html#WsError	object WsError		64
+nim	WsProtocolError	cps/http/shared/ws.html#WsProtocolError	object WsProtocolError		65
+nim	newWsProtocolError	cps/http/shared/ws.html#newWsProtocolError,uint16,string	proc newWsProtocolError(code: uint16; msg: string): ref WsProtocolError		68
+nim	getState	cps/http/shared/ws.html#getState,WebSocket	proc getState(ws: WebSocket): WsState		83
+nim	setState	cps/http/shared/ws.html#setState,WebSocket,WsState	proc setState(ws: WebSocket; newState: WsState)		87
+nim	initWsMtFields	cps/http/shared/ws.html#initWsMtFields,WebSocket	proc initWsMtFields(ws: WebSocket)		91
+nim	computeAcceptKey	cps/http/shared/ws.html#computeAcceptKey,string	proc computeAcceptKey(clientKey: string): string		99
+nim	parseWsExtensions	cps/http/shared/ws.html#parseWsExtensions,string	proc parseWsExtensions(header: string): tuple[enabled: bool, serverNoCtx: bool,\n    clientNoCtx: bool]		109
+nim	recvFrame	cps/http/shared/ws.html#recvFrame,WebSocket	proc recvFrame(ws: WebSocket): CpsFuture[WsFrame]		2410
+nim	sendFrame	cps/http/shared/ws.html#sendFrame,WebSocket,WsOpcode,string,bool	proc sendFrame(ws: WebSocket; opcode: WsOpcode; payload: string; fin: bool = true): CpsVoidFuture		210
+nim	recvMessage	cps/http/shared/ws.html#recvMessage,WebSocket	proc recvMessage(ws: WebSocket): CpsFuture[WsMessage]		2410
+nim	sendText	cps/http/shared/ws.html#sendText,WebSocket,string	proc sendText(ws: WebSocket; data: string): CpsVoidFuture		454
+nim	sendBinary	cps/http/shared/ws.html#sendBinary,WebSocket,string	proc sendBinary(ws: WebSocket; data: string): CpsVoidFuture		462
+nim	sendPing	cps/http/shared/ws.html#sendPing,WebSocket,string	proc sendPing(ws: WebSocket; payload: string = ""): CpsVoidFuture		466
+nim	sendPong	cps/http/shared/ws.html#sendPong,WebSocket,string	proc sendPong(ws: WebSocket; payload: string = ""): CpsVoidFuture		470
+nim	sendClose	cps/http/shared/ws.html#sendClose,WebSocket,uint16,string	proc sendClose(ws: WebSocket; code: uint16 = 1000; reason: string = ""): CpsVoidFuture		474
+nim	close	cps/http/shared/ws.html#close,WebSocket	proc close(ws: WebSocket)		496

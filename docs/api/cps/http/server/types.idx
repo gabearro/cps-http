@@ -1,0 +1,32 @@
+nimTitle	types	cps/http/server/types.html	module cps/http/server/types		0
+nim	rcNone	cps/http/server/types.html#rcNone	ResponseControl.rcNone		16
+nim	rcPassRoute	cps/http/server/types.html#rcPassRoute	ResponseControl.rcPassRoute		16
+nim	rcContinue	cps/http/server/types.html#rcContinue	ResponseControl.rcContinue		16
+nim	rcHandled	cps/http/server/types.html#rcHandled	ResponseControl.rcHandled		16
+nim	ResponseControl	cps/http/server/types.html#ResponseControl	enum ResponseControl		16
+nim	TemplateRenderer	cps/http/server/types.html#TemplateRenderer	type TemplateRenderer		22
+nim	HttpRequest	cps/http/server/types.html#HttpRequest	object HttpRequest		24
+nim	HttpResponseBuilder	cps/http/server/types.html#HttpResponseBuilder	object HttpResponseBuilder		40
+nim	HttpHandler	cps/http/server/types.html#HttpHandler	type HttpHandler		46
+nim	HttpServerConfig	cps/http/server/types.html#HttpServerConfig	object HttpServerConfig		48
+nim	HttpServer	cps/http/server/types.html#HttpServer	type HttpServer		83
+nim	newResponse	cps/http/server/types.html#newResponse,int,string,seq[]	proc newResponse(statusCode: int; body: string = "";\n            headers: seq[(string, string)] = @[]): HttpResponseBuilder		94
+nim	passRouteResponse	cps/http/server/types.html#passRouteResponse,seq[]	proc passRouteResponse(headers: seq[(string, string)] = @[]): HttpResponseBuilder		104
+nim	continueResponse	cps/http/server/types.html#continueResponse	proc continueResponse(): HttpResponseBuilder		113
+nim	handledResponse	cps/http/server/types.html#handledResponse	proc handledResponse(): HttpResponseBuilder		122
+nim	eqCaseInsensitive	cps/http/server/types.html#eqCaseInsensitive,string,string	proc eqCaseInsensitive(a, b: string): bool		131
+nim	ensureContext	cps/http/server/types.html#ensureContext,HttpRequest	proc ensureContext(req: var HttpRequest)		138
+nim	getHeader	cps/http/server/types.html#getHeader,HttpRequest,string	proc getHeader(req: HttpRequest; name: string): string		143
+nim	getResponseHeader	cps/http/server/types.html#getResponseHeader,HttpResponseBuilder,string	proc getResponseHeader(resp: HttpResponseBuilder; name: string): string		150
+nim	isValidHeaderName	cps/http/server/types.html#isValidHeaderName,string	proc isValidHeaderName(name: string): bool		160
+nim	isValidHeaderValue	cps/http/server/types.html#isValidHeaderValue,string	proc isValidHeaderValue(value: string): bool		169
+nim	validateHeaderPair	cps/http/server/types.html#validateHeaderPair,string,string	proc validateHeaderPair(name, value: string): bool		182
+nim	validateResponseHeaders	cps/http/server/types.html#validateResponseHeaders,seq[]	proc validateResponseHeaders(headers: seq[(string, string)]): bool		186
+nim	isTrustedProxyAddress	cps/http/server/types.html#isTrustedProxyAddress,string,seq[string]	proc isTrustedProxyAddress(ip: string; cidrs: seq[string]): bool		240
+nim	statusMessage	cps/http/server/types.html#statusMessage,int	proc statusMessage(code: int): string		251
+nim	newHttpServer	cps/http/server/types.html#newHttpServer,HttpHandler,string,int,bool,string,string,bool,bool,int,bool,bool,bool,int,uint64,uint64,uint64,uint64,uint64,uint64,int,bool,int,bool,int,int,int,int,int,int,int,int,int,seq[string],bool	proc newHttpServer(handler: HttpHandler; host: string = "127.0.0.1"; port: int = 0;\n              useTls: bool = false; certFile: string = ""; keyFile: string = "";\n              enableHttp2: bool = true; enableHttp3: bool = false;\n              quicIdleTimeoutMs: int = 30000; quicUseRetry: bool = true;\n              quicEnableMigration: bool = true; quicEnableDatagram: bool = true;\n              quicMaxDatagramFrameSize: int = 1200;\n              quicInitialMaxData: uint64 = 1048576'u64;\n              quicInitialMaxStreamDataBidiLocal: uint64 = 262144'u64;\n              quicInitialMaxStreamDataBidiRemote: uint64 = 262144'u64;\n              quicInitialMaxStreamDataUni: uint64 = 262144'u64;\n              quicInitialMaxStreamsBidi: uint64 = 100'u64;\n              quicInitialMaxStreamsUni: uint64 = 100'u64;\n              maxConnections: int = 1000; reusePort: bool = false;\n              deferAcceptSeconds: int = 1; tcpNoDelay: bool = true;\n              initialReadBufferBytes: int = 2048;\n              maxRequestBodySize: int = 10240 * 1024;\n              readTimeoutMs: int = 30000; maxRequestLineSize: int = 8 * 1024;\n              maxHeaderLineSize: int = 8 * 1024;\n              maxHeaderBytes: int = 64 * 1024; maxHeaderCount: int = 100;\n              maxWsFrameBytes: int = 1024 * 1024;\n              maxWsMessageBytes: int = 16384 * 1024;\n              trustedProxyCidrs: seq[string] = @[];\n              trustedForwardedHeaders: bool = false): HttpServer		281
+nim	getPort	cps/http/server/types.html#getPort,HttpServer	proc getPort(server: HttpServer): int		360
+nim	bindAndListen	cps/http/server/types.html#bindAndListen,HttpServer	proc bindAndListen(server: HttpServer)		364
+nim	stop	cps/http/server/types.html#stop,HttpServer	proc stop(server: HttpServer)		382
+nim	onStart	cps/http/server/types.html#onStart,HttpServer,proc)	proc onStart(server: HttpServer; cb: proc ())		386
+nim	onShutdown	cps/http/server/types.html#onShutdown,HttpServer,proc)	proc onShutdown(server: HttpServer; cb: proc ())		390

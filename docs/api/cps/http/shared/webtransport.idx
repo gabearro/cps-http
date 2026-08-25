@@ -1,0 +1,23 @@
+nimTitle	webtransport	cps/http/shared/webtransport.html	module cps/http/shared/webtransport		0
+nim	WebTransportProtocolToken	cps/http/shared/webtransport.html#WebTransportProtocolToken	const WebTransportProtocolToken		8
+nim	WebTransportDraftVersion	cps/http/shared/webtransport.html#WebTransportDraftVersion	const WebTransportDraftVersion		9
+nim	DefaultWebTransportMaxIncomingDatagrams	cps/http/shared/webtransport.html#DefaultWebTransportMaxIncomingDatagrams	const DefaultWebTransportMaxIncomingDatagrams		10
+nim	DefaultWebTransportMaxIncomingDatagramBytes	cps/http/shared/webtransport.html#DefaultWebTransportMaxIncomingDatagramBytes	const DefaultWebTransportMaxIncomingDatagramBytes		11
+nim	WebTransportConnectRequest	cps/http/shared/webtransport.html#WebTransportConnectRequest	object WebTransportConnectRequest		16
+nim	WebTransportSession	cps/http/shared/webtransport.html#WebTransportSession	type WebTransportSession		25
+nim	acceptWebTransportSession	cps/http/shared/webtransport.html#acceptWebTransportSession,uint64,string,string,string	proc acceptWebTransportSession(sessionId: uint64; authority: string; path: string;\n                          origin: string = ""): WebTransportSession		67
+nim	openWebTransportSession	cps/http/shared/webtransport.html#openWebTransportSession,uint64,string,string,string	proc openWebTransportSession(sessionId: uint64 = 0'u64; authority: string;\n                        path: string; origin: string = ""): WebTransportSession		75
+nim	buildWebTransportConnectHeaders	cps/http/shared/webtransport.html#buildWebTransportConnectHeaders,string,string,string,string	proc buildWebTransportConnectHeaders(authority: string; path: string;\n                                origin: string = "";\n                                draftVersion: string = WebTransportDraftVersion): seq[\n    QpackHeaderField]		81
+nim	parseWebTransportConnectHeaders	cps/http/shared/webtransport.html#parseWebTransportConnectHeaders,openArray[QpackHeaderField]	proc parseWebTransportConnectHeaders(headers: openArray[QpackHeaderField]): WebTransportConnectRequest		98
+nim	isWebTransportConnectRequest	cps/http/shared/webtransport.html#isWebTransportConnectRequest,openArray[QpackHeaderField]	proc isWebTransportConnectRequest(headers: openArray[QpackHeaderField]): bool		128
+nim	encodeWebTransportDatagram	cps/http/shared/webtransport.html#encodeWebTransportDatagram,uint64,openArray[byte]	proc encodeWebTransportDatagram(sessionId: uint64; payload: openArray[byte]): seq[\n    byte]		134
+nim	decodeWebTransportDatagram	cps/http/shared/webtransport.html#decodeWebTransportDatagram,openArray[byte]	proc decodeWebTransportDatagram(payload: openArray[byte]): tuple[sessionId: uint64,\n    data: seq[byte]]		142
+nim	openBidiStream	cps/http/shared/webtransport.html#openBidiStream,WebTransportSession	proc openBidiStream(session: WebTransportSession): uint64		151
+nim	openUniStream	cps/http/shared/webtransport.html#openUniStream,WebTransportSession	proc openUniStream(session: WebTransportSession): uint64		166
+nim	sendDatagram	cps/http/shared/webtransport.html#sendDatagram,WebTransportSession,openArray[byte]	proc sendDatagram(session: WebTransportSession; payload: openArray[byte])		181
+nim	popOutgoingDatagrams	cps/http/shared/webtransport.html#popOutgoingDatagrams,WebTransportSession	proc popOutgoingDatagrams(session: WebTransportSession): seq[seq[byte]]		189
+nim	recvDatagram	cps/http/shared/webtransport.html#recvDatagram,WebTransportSession	proc recvDatagram(session: WebTransportSession): seq[byte]		196
+nim	ingestDatagram	cps/http/shared/webtransport.html#ingestDatagram,WebTransportSession,openArray[byte]	proc ingestDatagram(session: WebTransportSession; payload: openArray[byte])		222
+nim	closeSession	cps/http/shared/webtransport.html#closeSession,WebTransportSession,uint32,string	proc closeSession(session: WebTransportSession; errorCode: uint32 = 0'u32;\n             reason: string = "")		233
+nim	queuedIncomingDatagrams	cps/http/shared/webtransport.html#queuedIncomingDatagrams,WebTransportSession	proc queuedIncomingDatagrams(session: WebTransportSession): int		242
+nim	queuedIncomingDatagramBytes	cps/http/shared/webtransport.html#queuedIncomingDatagramBytes,WebTransportSession	proc queuedIncomingDatagramBytes(session: WebTransportSession): int		248

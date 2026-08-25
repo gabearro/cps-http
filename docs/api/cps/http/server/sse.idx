@@ -1,0 +1,8 @@
+nimTitle	sse	cps/http/server/sse.html	module cps/http/server/sse		0
+nim	SseWriter	cps/http/server/sse.html#SseWriter	type SseWriter		27
+nim	isClosed	cps/http/server/sse.html#isClosed,SseWriter	proc isClosed(sse: SseWriter): bool		32
+nim	sseResponse	cps/http/server/sse.html#sseResponse	proc sseResponse(): HttpResponseBuilder		36
+nim	initSse	cps/http/server/sse.html#initSse,AsyncStream,seq[],HttpRequest	proc initSse(stream: AsyncStream; extraHeaders: seq[(string, string)] = @[];\n        req: HttpRequest = HttpRequest()): CpsFuture[SseWriter]		41
+nim	sendEvent	cps/http/server/sse.html#sendEvent,SseWriter,string,string,string,int	proc sendEvent(writer: SseWriter; data: string; event: string = ""; id: string = "";\n          retry: int = -1): CpsVoidFuture		111
+nim	sendComment	cps/http/server/sse.html#sendComment,SseWriter,string	proc sendComment(writer: SseWriter; text: string): CpsVoidFuture		133
+nim	close	cps/http/server/sse.html#close,SseWriter	proc close(writer: SseWriter)		142

@@ -1,0 +1,7 @@
+nimTitle	http1	cps/http/client/http1.html	module cps/http/client/http1		0
+nim	HttpResponse	cps/http/client/http1.html#HttpResponse	object HttpResponse		14
+nim	Http1Connection	cps/http/client/http1.html#Http1Connection	type Http1Connection		21
+nim	getHeader	cps/http/client/http1.html#getHeader,HttpResponse,string	proc getHeader(resp: HttpResponse; name: string): string		35
+nim	sendRequest	cps/http/client/http1.html#sendRequest,Http1Connection,string,string,seq[],string	proc sendRequest(conn: Http1Connection; meth: string; path: string;\n            headers: seq[(string, string)] = @[]; body: string = ""): CpsVoidFuture		225
+nim	recvResponse	cps/http/client/http1.html#recvResponse,Http1Connection,bool	proc recvResponse(conn: Http1Connection; skipBody: bool = false): CpsFuture[\n    HttpResponse]		2410
+nim	request	cps/http/client/http1.html#request,Http1Connection,string,string,seq[],string	proc request(conn: Http1Connection; meth: string; path: string;\n        headers: seq[(string, string)] = @[]; body: string = ""): CpsFuture[\n    HttpResponse]		2410

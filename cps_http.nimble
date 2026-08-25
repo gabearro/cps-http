@@ -15,6 +15,9 @@ requires "zippy >= 0.10.0"
 task checkDocs, "Verify developer documentation coverage":
   exec "python3 scripts/check_dev_docs.py"
 
+task docs, "Generate the HTML API reference":
+  exec "python3 scripts/build_docs.py"
+
 task test, "Run the project test suite":
   exec "nim c -r tests/http/test_compression.nim"
   exec "nim c -r tests/http/test_http_dsl.nim"

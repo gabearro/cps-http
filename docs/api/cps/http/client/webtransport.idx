@@ -1,0 +1,8 @@
+nimTitle	webtransport	cps/http/client/webtransport.html	module cps/http/client/webtransport		0
+nim	openWebTransportSession	cps/http/client/webtransport.html#openWebTransportSession,string,string,uint64,string	proc openWebTransportSession(authority: string; path: string;\n                        sessionId: uint64 = 0'u64; origin: string = ""): CpsFuture[\n    WebTransportSession]		10
+nim	buildConnectHeaders	cps/http/client/webtransport.html#buildConnectHeaders,string,string,string	proc buildConnectHeaders(authority: string; path: string; origin: string = ""): seq[\n    (string, string)]		19
+nim	openBidiStream	cps/http/client/webtransport.html#openBidiStream	proc openBidiStream(session: wt_shared.WebTransportSession): uint64		25
+nim	openUniStream	cps/http/client/webtransport.html#openUniStream	proc openUniStream(session: wt_shared.WebTransportSession): uint64		29
+nim	sendDatagram	cps/http/client/webtransport.html#sendDatagram,,openArray[byte]	proc sendDatagram(session: wt_shared.WebTransportSession; payload: openArray[byte])		33
+nim	recvDatagram	cps/http/client/webtransport.html#recvDatagram	proc recvDatagram(session: wt_shared.WebTransportSession): seq[byte]		37
+nim	closeSession	cps/http/client/webtransport.html#closeSession,,uint32,string	proc closeSession(session: wt_shared.WebTransportSession; errorCode: uint32 = 0'u32;\n             reason: string = "")		42

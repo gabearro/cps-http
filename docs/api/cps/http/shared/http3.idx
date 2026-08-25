@@ -1,0 +1,47 @@
+nimTitle	http3	cps/http/shared/http3.html	module cps/http/shared/http3		0
+nim	H3FrameData	cps/http/shared/http3.html#H3FrameData	const H3FrameData		7
+nim	H3FrameHeaders	cps/http/shared/http3.html#H3FrameHeaders	const H3FrameHeaders		8
+nim	H3FrameCancelPush	cps/http/shared/http3.html#H3FrameCancelPush	const H3FrameCancelPush		9
+nim	H3FrameSettings	cps/http/shared/http3.html#H3FrameSettings	const H3FrameSettings		10
+nim	H3FramePushPromise	cps/http/shared/http3.html#H3FramePushPromise	const H3FramePushPromise		11
+nim	H3FrameGoaway	cps/http/shared/http3.html#H3FrameGoaway	const H3FrameGoaway		12
+nim	H3FrameMaxPushId	cps/http/shared/http3.html#H3FrameMaxPushId	const H3FrameMaxPushId		13
+nim	H3UniControlStream	cps/http/shared/http3.html#H3UniControlStream	const H3UniControlStream		15
+nim	H3UniPushStream	cps/http/shared/http3.html#H3UniPushStream	const H3UniPushStream		16
+nim	H3UniQpackEncoderStream	cps/http/shared/http3.html#H3UniQpackEncoderStream	const H3UniQpackEncoderStream		17
+nim	H3UniQpackDecoderStream	cps/http/shared/http3.html#H3UniQpackDecoderStream	const H3UniQpackDecoderStream		18
+nim	H3SettingQpackMaxTableCapacity	cps/http/shared/http3.html#H3SettingQpackMaxTableCapacity	const H3SettingQpackMaxTableCapacity		20
+nim	H3SettingMaxFieldSectionSize	cps/http/shared/http3.html#H3SettingMaxFieldSectionSize	const H3SettingMaxFieldSectionSize		21
+nim	H3SettingQpackBlockedStreams	cps/http/shared/http3.html#H3SettingQpackBlockedStreams	const H3SettingQpackBlockedStreams		22
+nim	H3SettingEnableConnectProtocol	cps/http/shared/http3.html#H3SettingEnableConnectProtocol	const H3SettingEnableConnectProtocol		23
+nim	H3SettingH3Datagram	cps/http/shared/http3.html#H3SettingH3Datagram	const H3SettingH3Datagram		24
+nim	H3ErrNoError	cps/http/shared/http3.html#H3ErrNoError	const H3ErrNoError		26
+nim	H3ErrGeneralProtocol	cps/http/shared/http3.html#H3ErrGeneralProtocol	const H3ErrGeneralProtocol		27
+nim	H3ErrInternal	cps/http/shared/http3.html#H3ErrInternal	const H3ErrInternal		28
+nim	H3ErrStreamCreation	cps/http/shared/http3.html#H3ErrStreamCreation	const H3ErrStreamCreation		29
+nim	H3ErrClosedCriticalStream	cps/http/shared/http3.html#H3ErrClosedCriticalStream	const H3ErrClosedCriticalStream		30
+nim	H3ErrFrameUnexpected	cps/http/shared/http3.html#H3ErrFrameUnexpected	const H3ErrFrameUnexpected		31
+nim	H3ErrFrameError	cps/http/shared/http3.html#H3ErrFrameError	const H3ErrFrameError		32
+nim	H3ErrExcessiveLoad	cps/http/shared/http3.html#H3ErrExcessiveLoad	const H3ErrExcessiveLoad		33
+nim	H3ErrIdError	cps/http/shared/http3.html#H3ErrIdError	const H3ErrIdError		34
+nim	H3ErrSettingsError	cps/http/shared/http3.html#H3ErrSettingsError	const H3ErrSettingsError		35
+nim	H3ErrMissingSettings	cps/http/shared/http3.html#H3ErrMissingSettings	const H3ErrMissingSettings		36
+nim	H3ErrRequestRejected	cps/http/shared/http3.html#H3ErrRequestRejected	const H3ErrRequestRejected		37
+nim	H3ErrRequestCancelled	cps/http/shared/http3.html#H3ErrRequestCancelled	const H3ErrRequestCancelled		38
+nim	H3ErrRequestIncomplete	cps/http/shared/http3.html#H3ErrRequestIncomplete	const H3ErrRequestIncomplete		39
+nim	H3ErrMessageError	cps/http/shared/http3.html#H3ErrMessageError	const H3ErrMessageError		40
+nim	H3ErrConnectError	cps/http/shared/http3.html#H3ErrConnectError	const H3ErrConnectError		41
+nim	H3ErrVersionFallback	cps/http/shared/http3.html#H3ErrVersionFallback	const H3ErrVersionFallback		42
+nim	QpackErrDecompressionFailed	cps/http/shared/http3.html#QpackErrDecompressionFailed	const QpackErrDecompressionFailed		44
+nim	QpackErrEncoderStream	cps/http/shared/http3.html#QpackErrEncoderStream	const QpackErrEncoderStream		45
+nim	QpackErrDecoderStream	cps/http/shared/http3.html#QpackErrDecoderStream	const QpackErrDecoderStream		46
+nim	Http3Frame	cps/http/shared/http3.html#Http3Frame	object Http3Frame		50
+nim	encodeHttp3Frame	cps/http/shared/http3.html#encodeHttp3Frame,uint64,openArray[byte]	proc encodeHttp3Frame(frameType: uint64; payload: openArray[byte]): seq[byte]		58
+nim	encodeHttp3Frame	cps/http/shared/http3.html#encodeHttp3Frame,Http3Frame	proc encodeHttp3Frame(frame: Http3Frame): seq[byte]		65
+nim	decodeHttp3Frame	cps/http/shared/http3.html#decodeHttp3Frame,openArray[byte],int	proc decodeHttp3Frame(data: openArray[byte]; offset: var int): Http3Frame		69
+nim	decodeAllHttp3Frames	cps/http/shared/http3.html#decodeAllHttp3Frames,openArray[byte]	proc decodeAllHttp3Frames(data: openArray[byte]): seq[Http3Frame]		82
+nim	encodeSettingsPayload	cps/http/shared/http3.html#encodeSettingsPayload,openArray[]	proc encodeSettingsPayload(settings: openArray[(uint64, uint64)]): seq[byte]		88
+nim	decodeSettingsPayload	cps/http/shared/http3.html#decodeSettingsPayload,openArray[byte]	proc decodeSettingsPayload(payload: openArray[byte]): seq[(uint64, uint64)]		95
+nim	decodeSettingsPayloadStrict	cps/http/shared/http3.html#decodeSettingsPayloadStrict,openArray[byte]	proc decodeSettingsPayloadStrict(payload: openArray[byte]): seq[(uint64, uint64)]		103
+nim	describeHttp3FrameType	cps/http/shared/http3.html#describeHttp3FrameType,uint64	proc describeHttp3FrameType(frameType: uint64): string		130
+nimgrp	encodehttp3frame	cps/http/shared/http3.html#encodeHttp3Frame-procs-all	proc		58

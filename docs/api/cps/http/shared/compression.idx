@@ -1,0 +1,54 @@
+nimTitle	compression	cps/http/shared/compression.html	module cps/http/shared/compression		0
+nim	ceIdentity	cps/http/shared/compression.html#ceIdentity	ContentEncoding.ceIdentity		17
+nim	ceGzip	cps/http/shared/compression.html#ceGzip	ContentEncoding.ceGzip		17
+nim	ceDeflate	cps/http/shared/compression.html#ceDeflate	ContentEncoding.ceDeflate		17
+nim	ceZstd	cps/http/shared/compression.html#ceZstd	ContentEncoding.ceZstd		17
+nim	ceBrotli	cps/http/shared/compression.html#ceBrotli	ContentEncoding.ceBrotli		17
+nim	ContentEncoding	cps/http/shared/compression.html#ContentEncoding	enum ContentEncoding		17
+nim	CompressionError	cps/http/shared/compression.html#CompressionError	object CompressionError		24
+nim	clFast	cps/http/shared/compression.html#clFast	CompressionLevel.clFast		26
+nim	clDefault	cps/http/shared/compression.html#clDefault	CompressionLevel.clDefault		26
+nim	clBest	cps/http/shared/compression.html#clBest	CompressionLevel.clBest		26
+nim	CompressionLevel	cps/http/shared/compression.html#CompressionLevel	enum CompressionLevel		26
+nim	gzipCompress	cps/http/shared/compression.html#gzipCompress,string,CompressionLevel	proc gzipCompress(data: string; level: CompressionLevel = clDefault): string		35
+nim	gzipDecompress	cps/http/shared/compression.html#gzipDecompress,string	proc gzipDecompress(data: string): string		46
+nim	deflateCompress	cps/http/shared/compression.html#deflateCompress,string,CompressionLevel	proc deflateCompress(data: string; level: CompressionLevel = clDefault): string		53
+nim	deflateDecompress	cps/http/shared/compression.html#deflateDecompress,string	proc deflateDecompress(data: string): string		64
+nim	Z_OK	cps/http/shared/compression.html#Z_OK	const Z_OK		78
+nim	Z_STREAM_END	cps/http/shared/compression.html#Z_STREAM_END	const Z_STREAM_END		79
+nim	Z_BUF_ERROR	cps/http/shared/compression.html#Z_BUF_ERROR	const Z_BUF_ERROR		80
+nim	Z_SYNC_FLUSH	cps/http/shared/compression.html#Z_SYNC_FLUSH	const Z_SYNC_FLUSH		81
+nim	Z_FINISH	cps/http/shared/compression.html#Z_FINISH	const Z_FINISH		82
+nim	Z_NO_FLUSH	cps/http/shared/compression.html#Z_NO_FLUSH	const Z_NO_FLUSH		83
+nim	MAX_WBITS	cps/http/shared/compression.html#MAX_WBITS	const MAX_WBITS		84
+nim	Z_DEFLATED	cps/http/shared/compression.html#Z_DEFLATED	const Z_DEFLATED		85
+nim	Z_DEFAULT_STRATEGY	cps/http/shared/compression.html#Z_DEFAULT_STRATEGY	const Z_DEFAULT_STRATEGY		86
+nim	Z_DEFAULT_COMPRESSION	cps/http/shared/compression.html#Z_DEFAULT_COMPRESSION	const Z_DEFAULT_COMPRESSION		87
+nim	ZStream	cps/http/shared/compression.html#ZStream	object ZStream		93
+nim	ZlibCompressor	cps/http/shared/compression.html#ZlibCompressor	type ZlibCompressor		132
+nim	ZlibDecompressor	cps/http/shared/compression.html#ZlibDecompressor	type ZlibDecompressor		136
+nim	newZlibCompressor	cps/http/shared/compression.html#newZlibCompressor,ContentEncoding	proc newZlibCompressor(encoding: ContentEncoding = ceGzip): ZlibCompressor		140
+nim	compressChunk	cps/http/shared/compression.html#compressChunk,ZlibCompressor,string	proc compressChunk(c: ZlibCompressor; data: string): string		160
+nim	finish	cps/http/shared/compression.html#finish,ZlibCompressor	proc finish(c: ZlibCompressor): string		182
+nim	destroy	cps/http/shared/compression.html#destroy,ZlibCompressor	proc destroy(c: ZlibCompressor)		203
+nim	newZlibDecompressor	cps/http/shared/compression.html#newZlibDecompressor,ContentEncoding	proc newZlibDecompressor(encoding: ContentEncoding = ceGzip): ZlibDecompressor		209
+nim	decompressChunk	cps/http/shared/compression.html#decompressChunk,ZlibDecompressor,string	proc decompressChunk(d: ZlibDecompressor; data: string): string		228
+nim	destroy	cps/http/shared/compression.html#destroy,ZlibDecompressor	proc destroy(d: ZlibDecompressor)		259
+nim	rawDeflateCompress	cps/http/shared/compression.html#rawDeflateCompress,string,CompressionLevel	proc rawDeflateCompress(data: string; level: CompressionLevel = clDefault): string		269
+nim	rawDeflateDecompressLimited	cps/http/shared/compression.html#rawDeflateDecompressLimited,string,int	proc rawDeflateDecompressLimited(data: string; maxOutputBytes: int = -1): string		315
+nim	rawDeflateDecompress	cps/http/shared/compression.html#rawDeflateDecompress,string	proc rawDeflateDecompress(data: string): string		372
+nim	compress	cps/http/shared/compression.html#compress,string,ContentEncoding,CompressionLevel	proc compress(data: string; encoding: ContentEncoding;\n         level: CompressionLevel = clDefault): string		486
+nim	decompress	cps/http/shared/compression.html#decompress,string,ContentEncoding	proc decompress(data: string; encoding: ContentEncoding): string		504
+nim	parseContentEncoding	cps/http/shared/compression.html#parseContentEncoding,string	proc parseContentEncoding(header: string): ContentEncoding		525
+nim	parseAcceptEncoding	cps/http/shared/compression.html#parseAcceptEncoding,string	proc parseAcceptEncoding(header: string): seq[(ContentEncoding, float)]		536
+nim	bestEncoding	cps/http/shared/compression.html#bestEncoding,seq[]	proc bestEncoding(accepted: seq[(ContentEncoding, float)]): ContentEncoding		560
+nim	buildAcceptEncoding	cps/http/shared/compression.html#buildAcceptEncoding	proc buildAcceptEncoding(): string		598
+nim	encodingName	cps/http/shared/compression.html#encodingName,ContentEncoding	proc encodingName(enc: ContentEncoding): string		609
+nim	isCompressible	cps/http/shared/compression.html#isCompressible,string	proc isCompressible(contentType: string): bool		618
+nim	DecompressedStream	cps/http/shared/compression.html#DecompressedStream	type DecompressedStream		637
+nim	newDecompressedStream	cps/http/shared/compression.html#newDecompressedStream,AsyncStream,ContentEncoding	proc newDecompressedStream(underlying: AsyncStream;\n                      encoding: ContentEncoding = ceGzip): DecompressedStream		667
+nim	PrefixedStream	cps/http/shared/compression.html#PrefixedStream	type PrefixedStream		684
+nim	newPrefixedStream	cps/http/shared/compression.html#newPrefixedStream,string,AsyncStream	proc newPrefixedStream(prefix: string; underlying: AsyncStream): PrefixedStream		712
+nim	ChunkedDecompressedStream	cps/http/shared/compression.html#ChunkedDecompressedStream	type ChunkedDecompressedStream		730
+nim	newChunkedDecompressedStream	cps/http/shared/compression.html#newChunkedDecompressedStream,AsyncStream,ContentEncoding	proc newChunkedDecompressedStream(underlying: AsyncStream;\n                             encoding: ContentEncoding = ceGzip): ChunkedDecompressedStream		826
+nimgrp	destroy	cps/http/shared/compression.html#destroy-procs-all	proc		203

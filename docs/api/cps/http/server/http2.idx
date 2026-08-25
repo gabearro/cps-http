@@ -1,0 +1,14 @@
+nimTitle	http2	cps/http/server/http2.html	module cps/http/server/http2		0
+nim	Http2ServerStream	cps/http/server/http2.html#Http2ServerStream	type Http2ServerStream		31
+nim	Http2ServerConnection	cps/http/server/http2.html#Http2ServerConnection	type Http2ServerConnection		47
+nim	newHttp2ServerConnection	cps/http/server/http2.html#newHttp2ServerConnection,AsyncStream,HttpServerConfig,HttpHandler,ptr.bool,string	proc newHttp2ServerConnection(s: AsyncStream; config: HttpServerConfig;\n                         handler: HttpHandler; shutdownFlag: ptr bool = nil;\n                         remoteAddr: string = ""): Http2ServerConnection		107
+nim	sendFrame	cps/http/server/http2.html#sendFrame,Http2ServerConnection,Http2Frame	proc sendFrame(conn: Http2ServerConnection; frame: Http2Frame): CpsVoidFuture		2410
+nim	sendGoAway	cps/http/server/http2.html#sendGoAway,Http2ServerConnection,uint32,uint32	proc sendGoAway(conn: Http2ServerConnection; errorCode: uint32;\n           lastStreamId: uint32 = 0'u32): CpsVoidFuture		2410
+nim	sendServerSettings	cps/http/server/http2.html#sendServerSettings,Http2ServerConnection	proc sendServerSettings(conn: Http2ServerConnection): CpsVoidFuture		2410
+nim	readConnectionPreface	cps/http/server/http2.html#readConnectionPreface,Http2ServerConnection	proc readConnectionPreface(conn: Http2ServerConnection): CpsVoidFuture		2410
+nim	recvServerFrame	cps/http/server/http2.html#recvServerFrame,Http2ServerConnection	proc recvServerFrame(conn: Http2ServerConnection): CpsFuture[Http2Frame]		2410
+nim	sendResponseHeaders	cps/http/server/http2.html#sendResponseHeaders,Http2ServerConnection,uint32,int,seq[],bool	proc sendResponseHeaders(conn: Http2ServerConnection; streamId: uint32;\n                    statusCode: int; headers: seq[(string, string)];\n                    endStream: bool): CpsVoidFuture		2410
+nim	sendResponseData	cps/http/server/http2.html#sendResponseData,Http2ServerConnection,uint32,seq[byte],bool	proc sendResponseData(conn: Http2ServerConnection; streamId: uint32; data: seq[byte];\n                 endStream: bool): CpsVoidFuture		2410
+nim	dispatchHttp2Handler	cps/http/server/http2.html#dispatchHttp2Handler,Http2ServerConnection,uint32,HttpRequest	proc dispatchHttp2Handler(conn: Http2ServerConnection; streamId: uint32;\n                     req: HttpRequest): CpsVoidFuture		2410
+nim	processServerFrame	cps/http/server/http2.html#processServerFrame,Http2ServerConnection,Http2Frame	proc processServerFrame(conn: Http2ServerConnection; frame: Http2Frame): CpsVoidFuture		2410
+nim	handleHttp2Connection	cps/http/server/http2.html#handleHttp2Connection,AsyncStream,HttpServerConfig,HttpHandler,string,ptr.bool	proc handleHttp2Connection(stream: AsyncStream; config: HttpServerConfig;\n                      handler: HttpHandler; remoteAddr: string = "";\n                      shutdownFlag: ptr bool = nil): CpsVoidFuture		2410

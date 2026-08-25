@@ -1,0 +1,19 @@
+nimTitle	hpack	cps/http/shared/hpack.html	module cps/http/shared/hpack		0
+nim	StaticTable	cps/http/shared/hpack.html#StaticTable	const StaticTable		7
+nim	DynamicTable	cps/http/shared/hpack.html#DynamicTable	object DynamicTable		73
+nim	HpackEncoder	cps/http/shared/hpack.html#HpackEncoder	object HpackEncoder		78
+nim	HpackDecoder	cps/http/shared/hpack.html#HpackDecoder	object HpackDecoder		81
+nim	initDynamicTable	cps/http/shared/hpack.html#initDynamicTable,int	proc initDynamicTable(maxSize: int = 4096): DynamicTable		87
+nim	add	cps/http/shared/hpack.html#add,DynamicTable,string,string	proc add(dt: var DynamicTable; name, value: string)		96
+nim	get	cps/http/shared/hpack.html#get,DynamicTable,int	proc get(dt: DynamicTable; index: int): (string, string)		107
+nim	encodeInteger	cps/http/shared/hpack.html#encodeInteger,int,int,byte	proc encodeInteger(value: int; prefixBits: int; firstByte: byte): seq[byte]		126
+nim	decodeInteger	cps/http/shared/hpack.html#decodeInteger,openArray[byte],int,int	proc decodeInteger(data: openArray[byte]; offset: var int; prefixBits: int): int		139
+nim	HuffmanTable	cps/http/shared/hpack.html#HuffmanTable	const HuffmanTable		161
+nim	huffmanDecode	cps/http/shared/hpack.html#huffmanDecode,openArray[byte],int,int	proc huffmanDecode(data: openArray[byte]; startOffset: int; length: int): string		499
+nim	huffmanEncode	cps/http/shared/hpack.html#huffmanEncode,string	proc huffmanEncode(s: string): seq[byte]		523
+nim	encodeString	cps/http/shared/hpack.html#encodeString,string,bool	proc encodeString(s: string; huffman: bool = false): seq[byte]		553
+nim	decodeString	cps/http/shared/hpack.html#decodeString,openArray[byte],int	proc decodeString(data: openArray[byte]; offset: var int): string		565
+nim	initHpackEncoder	cps/http/shared/hpack.html#initHpackEncoder,int	proc initHpackEncoder(maxSize: int = 4096): HpackEncoder		582
+nim	encode	cps/http/shared/hpack.html#encode,HpackEncoder,seq[]	proc encode(enc: var HpackEncoder; headers: seq[(string, string)]): seq[byte]		598
+nim	initHpackDecoder	cps/http/shared/hpack.html#initHpackDecoder,int	proc initHpackDecoder(maxSize: int = 4096): HpackDecoder		623
+nim	decode	cps/http/shared/hpack.html#decode,HpackDecoder,openArray[byte]	proc decode(dec: var HpackDecoder; data: openArray[byte]): seq[(string, string)]		627

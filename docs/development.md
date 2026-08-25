@@ -54,8 +54,12 @@ helpers still need a useful contract; a macro name is not its documentation.
 
 ```sh
 nimble checkDocs
+nimble docs
 nimble test
 ```
+
+The generated Nim API reference is committed under `docs/api`; open
+`docs/api/theindex.html` to search exported symbols and their `##` docstrings.
 
 Run protocol interop after changing HPACK, QPACK, TLS negotiation, or QUIC
 integration. Run the benchmark adapter only after correctness tests pass.

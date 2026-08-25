@@ -165,8 +165,12 @@ APIs, ownership, protocol state, or execution behavior.
 ```sh
 nimble install -d -y
 nimble checkDocs
+nimble docs
 nimble test
 ```
+
+`nimble docs` writes the generated API reference to
+[`docs/api/theindex.html`](docs/api/theindex.html).
 
 The suite covers compression, the DSL, HTTP/1.1 and HTTP/2 server behavior,
 TLS, and WebSocket hardening. Protocol-specific interop tests remain

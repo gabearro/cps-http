@@ -1,0 +1,8 @@
+nimTitle	multipart	cps/http/shared/multipart.html	module cps/http/shared/multipart		0
+nim	UploadedFile	cps/http/shared/multipart.html#UploadedFile	object UploadedFile		8
+nim	MultipartData	cps/http/shared/multipart.html#MultipartData	object MultipartData		15
+nim	extractBoundary	cps/http/shared/multipart.html#extractBoundary,string	proc extractBoundary(contentType: string): string		19
+nim	parseMultipart	cps/http/shared/multipart.html#parseMultipart,string,string	proc parseMultipart(body: string; contentType: string): MultipartData		59
+nim	getUploadedFile	cps/http/shared/multipart.html#getUploadedFile,string,string,string	proc getUploadedFile(body: string; contentType: string; fieldName: string): UploadedFile		141
+nim	getUploadedFiles	cps/http/shared/multipart.html#getUploadedFiles,string,string,string	proc getUploadedFiles(body: string; contentType: string; fieldName: string): seq[\n    UploadedFile]		148
+nim	getMultipartField	cps/http/shared/multipart.html#getMultipartField,string,string,string	proc getMultipartField(body: string; contentType: string; fieldName: string): string		155

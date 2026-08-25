@@ -1,0 +1,7 @@
+nimTitle	session	cps/http/middleware/session.html	module cps/http/middleware/session		0
+nim	SessionConfig	cps/http/middleware/session.html#SessionConfig	object SessionConfig		19
+nim	newSessionConfig	cps/http/middleware/session.html#newSessionConfig,string,string,seq[string],int,bool,bool,string,string,int	proc newSessionConfig(secret: string; cookieName: string = "session";\n                 secretFallbacks: seq[string] = @[]; maxAge: int = 3600;\n                 httpOnly: bool = true; secure: bool = false;\n                 sameSite: string = "Lax"; path: string = "/";\n                 maxCookieBytes: int = 4096): SessionConfig		30
+nim	getSession	cps/http/middleware/session.html#getSession,HttpRequest,string	proc getSession(req: HttpRequest; key: string): string		176
+nim	setSession	cps/http/middleware/session.html#setSession,HttpRequest,string,string	proc setSession(req: HttpRequest; key: string; value: string)		182
+nim	clearSession	cps/http/middleware/session.html#clearSession,HttpRequest	proc clearSession(req: HttpRequest)		188
+nim	sessionMiddleware	cps/http/middleware/session.html#sessionMiddleware,SessionConfig	proc sessionMiddleware(config: SessionConfig): Middleware		219

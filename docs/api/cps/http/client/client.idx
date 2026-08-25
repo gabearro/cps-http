@@ -1,0 +1,26 @@
+nimTitle	client	cps/http/client/client.html	module cps/http/client/client		0
+nim	hvHttp11	cps/http/client/client.html#hvHttp11	HttpVersion.hvHttp11		32
+nim	hvHttp2	cps/http/client/client.html#hvHttp2	HttpVersion.hvHttp2		32
+nim	hvHttp3	cps/http/client/client.html#hvHttp3	HttpVersion.hvHttp3		32
+nim	HttpVersion	cps/http/client/client.html#HttpVersion	enum HttpVersion		32
+nim	HttpsResponse	cps/http/client/client.html#HttpsResponse	object HttpsResponse		37
+nim	PoolKey	cps/http/client/client.html#PoolKey	object PoolKey		43
+nim	PooledConnection	cps/http/client/client.html#PooledConnection	object PooledConnection		48
+nim	ConnectionPool	cps/http/client/client.html#ConnectionPool	type ConnectionPool		52
+nim	HttpsClient	cps/http/client/client.html#HttpsClient	type HttpsClient		57
+nim	newConnectionPool	cps/http/client/client.html#newConnectionPool,int,float	proc newConnectionPool(maxPerHost: int = 6; maxIdleSeconds: float = 30.0): ConnectionPool		95
+nim	evictExpired	cps/http/client/client.html#evictExpired,ConnectionPool	proc evictExpired(pool: ConnectionPool)		104
+nim	acquire	cps/http/client/client.html#acquire,ConnectionPool,PoolKey	proc acquire(pool: ConnectionPool; key: PoolKey): Option[Http1Connection]		122
+nim	release	cps/http/client/client.html#release,ConnectionPool,PoolKey,Http1Connection	proc release(pool: ConnectionPool; key: PoolKey; conn: Http1Connection)		152
+nim	poolSize	cps/http/client/client.html#poolSize,ConnectionPool,PoolKey	proc poolSize(pool: ConnectionPool; key: PoolKey): int		172
+nim	totalPoolSize	cps/http/client/client.html#totalPoolSize,ConnectionPool	proc totalPoolSize(pool: ConnectionPool): int		178
+nim	closeAll	cps/http/client/client.html#closeAll,ConnectionPool	proc closeAll(pool: ConnectionPool)		183
+nim	newHttpsClient	cps/http/client/client.html#newHttpsClient,bool,bool,bool,bool,bool,bool,bool,string,string,string,bool,int,bool,int,float,BrowserProfile,seq[ProxyConfig]	proc newHttpsClient(preferHttp2: bool = true; preferHttp3: bool = false;\n               forceHttp3: bool = false; http3FallbackToHttp2: bool = true;\n               http3EnableDatagram: bool = true; http3Enable0Rtt: bool = true;\n               http3VerifyPeer: bool = true; http3CaFile: string = "";\n               http3CaDir: string = "";\n               userAgent: string = "CPS-Nim-Client/0.1";\n               followRedirects: bool = true; maxRedirects: int = 10;\n               autoDecompress: bool = true; maxConnectionsPerHost: int = 6;\n               maxIdleSeconds: float = 30.0; fingerprint: BrowserProfile = nil;\n               proxy: seq[ProxyConfig] = @[]): HttpsClient		190
+nim	getHeader	cps/http/client/client.html#getHeader,HttpsResponse,string	proc getHeader(resp: HttpsResponse; name: string): string		318
+nim	fetch	cps/http/client/client.html#fetch,HttpsClient,string,string,seq[],string	proc fetch(client: HttpsClient; meth: string; url: string;\n      headers: seq[(string, string)] = @[]; body: string = ""): CpsFuture[\n    HttpsResponse]		2410
+nim	close	cps/http/client/client.html#close,HttpsClient	proc close(client: HttpsClient)		900
+nim	get	cps/http/client/client.html#get,HttpsClient,string,seq[]	proc get(client: HttpsClient; url: string; headers: seq[(string, string)] = @[]): CpsFuture[\n    HttpsResponse]		917
+nim	post	cps/http/client/client.html#post,HttpsClient,string,string,seq[]	proc post(client: HttpsClient; url: string; body: string;\n     headers: seq[(string, string)] = @[]): CpsFuture[HttpsResponse]		922
+nim	put	cps/http/client/client.html#put,HttpsClient,string,string,seq[]	proc put(client: HttpsClient; url: string; body: string;\n    headers: seq[(string, string)] = @[]): CpsFuture[HttpsResponse]		927
+nim	delete	cps/http/client/client.html#delete,HttpsClient,string,seq[]	proc delete(client: HttpsClient; url: string; headers: seq[(string, string)] = @[]): CpsFuture[\n    HttpsResponse]		932
+nim	head	cps/http/client/client.html#head,HttpsClient,string,seq[]	proc head(client: HttpsClient; url: string; headers: seq[(string, string)] = @[]): CpsFuture[\n    HttpsResponse]		937

@@ -1,0 +1,81 @@
+nimTitle	http3_connection	cps/http/shared/http3_connection.html	module cps/http/shared/http3_connection		0
+nim	DefaultMasqueCapsuleBufferBytes	cps/http/shared/http3_connection.html#DefaultMasqueCapsuleBufferBytes	const DefaultMasqueCapsuleBufferBytes		11
+nim	DefaultHttp3UniStreamBufferBytes	cps/http/shared/http3_connection.html#DefaultHttp3UniStreamBufferBytes	const DefaultHttp3UniStreamBufferBytes		12
+nim	DefaultHttp3RequestStreamBufferBytes	cps/http/shared/http3_connection.html#DefaultHttp3RequestStreamBufferBytes	const DefaultHttp3RequestStreamBufferBytes		13
+nim	DefaultHttp3TotalUniStreamBufferBytes	cps/http/shared/http3_connection.html#DefaultHttp3TotalUniStreamBufferBytes	const DefaultHttp3TotalUniStreamBufferBytes		14
+nim	DefaultHttp3TotalRequestStreamBufferBytes	cps/http/shared/http3_connection.html#DefaultHttp3TotalRequestStreamBufferBytes	const DefaultHttp3TotalRequestStreamBufferBytes		15
+nim	h3csInit	cps/http/shared/http3_connection.html#h3csInit	Http3ControlState.h3csInit		20
+nim	h3csSettingsSent	cps/http/shared/http3_connection.html#h3csSettingsSent	Http3ControlState.h3csSettingsSent		20
+nim	h3csReady	cps/http/shared/http3_connection.html#h3csReady	Http3ControlState.h3csReady		20
+nim	h3csGoawaySent	cps/http/shared/http3_connection.html#h3csGoawaySent	Http3ControlState.h3csGoawaySent		20
+nim	h3csClosing	cps/http/shared/http3_connection.html#h3csClosing	Http3ControlState.h3csClosing		20
+nim	Http3ControlState	cps/http/shared/http3_connection.html#Http3ControlState	enum Http3ControlState		20
+nim	h3srUnknown	cps/http/shared/http3_connection.html#h3srUnknown	Http3StreamRole.h3srUnknown		27
+nim	h3srControl	cps/http/shared/http3_connection.html#h3srControl	Http3StreamRole.h3srControl		27
+nim	h3srQpackEncoder	cps/http/shared/http3_connection.html#h3srQpackEncoder	Http3StreamRole.h3srQpackEncoder		27
+nim	h3srQpackDecoder	cps/http/shared/http3_connection.html#h3srQpackDecoder	Http3StreamRole.h3srQpackDecoder		27
+nim	h3srPush	cps/http/shared/http3_connection.html#h3srPush	Http3StreamRole.h3srPush		27
+nim	h3srRequest	cps/http/shared/http3_connection.html#h3srRequest	Http3StreamRole.h3srRequest		27
+nim	Http3StreamRole	cps/http/shared/http3_connection.html#Http3StreamRole	enum Http3StreamRole		27
+nim	h3evNone	cps/http/shared/http3_connection.html#h3evNone	Http3EventKind.h3evNone		35
+nim	h3evHeaders	cps/http/shared/http3_connection.html#h3evHeaders	Http3EventKind.h3evHeaders		35
+nim	h3evData	cps/http/shared/http3_connection.html#h3evData	Http3EventKind.h3evData		35
+nim	h3evSettings	cps/http/shared/http3_connection.html#h3evSettings	Http3EventKind.h3evSettings		35
+nim	h3evGoaway	cps/http/shared/http3_connection.html#h3evGoaway	Http3EventKind.h3evGoaway		35
+nim	h3evPushPromise	cps/http/shared/http3_connection.html#h3evPushPromise	Http3EventKind.h3evPushPromise		35
+nim	h3evCancelPush	cps/http/shared/http3_connection.html#h3evCancelPush	Http3EventKind.h3evCancelPush		35
+nim	h3evMaxPushId	cps/http/shared/http3_connection.html#h3evMaxPushId	Http3EventKind.h3evMaxPushId		35
+nim	h3evProtocolError	cps/http/shared/http3_connection.html#h3evProtocolError	Http3EventKind.h3evProtocolError		35
+nim	Http3EventKind	cps/http/shared/http3_connection.html#Http3EventKind	enum Http3EventKind		35
+nim	Http3Event	cps/http/shared/http3_connection.html#Http3Event	object Http3Event		46
+nim	Http3Connection	cps/http/shared/http3_connection.html#Http3Connection	type Http3Connection		64
+nim	newHttp3Connection	cps/http/shared/http3_connection.html#newHttp3Connection,bool,bool,int,int,int,int,int,int,int	proc newHttp3Connection(isClient: bool; useRfcQpackWire: bool = false;\n                   qpackTableCapacity: int = 4096;\n                   qpackBlockedStreams: int = 16; maxMasqueCapsuleBufferBytes: int = DefaultMasqueCapsuleBufferBytes;\n    maxUniStreamBufferBytes: int = DefaultHttp3UniStreamBufferBytes;\n    maxRequestStreamBufferBytes: int = DefaultHttp3RequestStreamBufferBytes;\n    maxTotalUniStreamBufferBytes: int = DefaultHttp3TotalUniStreamBufferBytes;\n    maxTotalRequestStreamBufferBytes: int = DefaultHttp3TotalRequestStreamBufferBytes): Http3Connection		129
+nim	encodeControlStreamPreface	cps/http/shared/http3_connection.html#encodeControlStreamPreface,Http3Connection	proc encodeControlStreamPreface(conn: Http3Connection): seq[byte]		227
+nim	encodeQpackEncoderStreamPreface	cps/http/shared/http3_connection.html#encodeQpackEncoderStreamPreface,Http3Connection	proc encodeQpackEncoderStreamPreface(conn: Http3Connection): seq[byte]		236
+nim	encodeQpackDecoderStreamPreface	cps/http/shared/http3_connection.html#encodeQpackDecoderStreamPreface,Http3Connection	proc encodeQpackDecoderStreamPreface(conn: Http3Connection): seq[byte]		241
+nim	peerSettingValue	cps/http/shared/http3_connection.html#peerSettingValue,Http3Connection,uint64,uint64	proc peerSettingValue(conn: Http3Connection; settingId: uint64;\n                 defaultValue: uint64 = 0'u64): uint64		246
+nim	localSettingValue	cps/http/shared/http3_connection.html#localSettingValue,Http3Connection,uint64,uint64	proc localSettingValue(conn: Http3Connection; settingId: uint64;\n                  defaultValue: uint64 = 0'u64): uint64		256
+nim	setLocalSettingValue	cps/http/shared/http3_connection.html#setLocalSettingValue,Http3Connection,uint64,uint64	proc setLocalSettingValue(conn: Http3Connection; settingId: uint64; value: uint64)		318
+nim	canSendH3Datagrams	cps/http/shared/http3_connection.html#canSendH3Datagrams,Http3Connection	proc canSendH3Datagrams(conn: Http3Connection): bool		337
+nim	drainQpackEncoderStreamData	cps/http/shared/http3_connection.html#drainQpackEncoderStreamData,Http3Connection	proc drainQpackEncoderStreamData(conn: Http3Connection): seq[byte]		368
+nim	drainQpackDecoderStreamData	cps/http/shared/http3_connection.html#drainQpackDecoderStreamData,Http3Connection	proc drainQpackDecoderStreamData(conn: Http3Connection): seq[byte]		373
+nim	encodeHeadersFrame	cps/http/shared/http3_connection.html#encodeHeadersFrame,Http3Connection,openArray[QpackHeaderField]	proc encodeHeadersFrame(conn: Http3Connection; headers: openArray[QpackHeaderField]): seq[\n    byte]		378
+nim	decodeHeadersFrame	cps/http/shared/http3_connection.html#decodeHeadersFrame,Http3Connection,openArray[byte]	proc decodeHeadersFrame(conn: Http3Connection; payload: openArray[byte]): seq[\n    QpackHeaderField]		390
+nim	encodeDataFrame	cps/http/shared/http3_connection.html#encodeDataFrame,openArray[byte]	proc encodeDataFrame(payload: openArray[byte]): seq[byte]		397
+nim	encodeGoawayFrame	cps/http/shared/http3_connection.html#encodeGoawayFrame,uint64	proc encodeGoawayFrame(id: uint64): seq[byte]		401
+nim	encodeCancelPushFrame	cps/http/shared/http3_connection.html#encodeCancelPushFrame,uint64	proc encodeCancelPushFrame(pushId: uint64): seq[byte]		407
+nim	encodeMaxPushIdFrame	cps/http/shared/http3_connection.html#encodeMaxPushIdFrame,uint64	proc encodeMaxPushIdFrame(pushId: uint64): seq[byte]		413
+nim	advertiseMaxPushId	cps/http/shared/http3_connection.html#advertiseMaxPushId,Http3Connection,uint64	proc advertiseMaxPushId(conn: Http3Connection; pushId: uint64): seq[byte]		419
+nim	encodePushPromiseFrame	cps/http/shared/http3_connection.html#encodePushPromiseFrame,uint64,openArray[byte]	proc encodePushPromiseFrame(pushId: uint64; headerBlock: openArray[byte]): seq[byte]		430
+nim	openRequest	cps/http/shared/http3_connection.html#openRequest,Http3Connection	proc openRequest(conn: Http3Connection): uint64		438
+nim	submitRequest	cps/http/shared/http3_connection.html#submitRequest,Http3Connection,openArray[QpackHeaderField],seq[byte]	proc submitRequest(conn: Http3Connection; headers: openArray[QpackHeaderField];\n              body: seq[byte] = @[]): seq[byte]		451
+nim	sendGoaway	cps/http/shared/http3_connection.html#sendGoaway,Http3Connection,uint64	proc sendGoaway(conn: Http3Connection; id: uint64): seq[byte]		459
+nim	sendGracefulServerGoaway	cps/http/shared/http3_connection.html#sendGracefulServerGoaway,Http3Connection	proc sendGracefulServerGoaway(conn: Http3Connection): seq[byte]		471
+nim	createPushPromise	cps/http/shared/http3_connection.html#createPushPromise,Http3Connection,uint64,openArray[QpackHeaderField]	proc createPushPromise(conn: Http3Connection; pushId: uint64;\n                  headers: openArray[QpackHeaderField]): seq[byte]		483
+nim	clearRequestStreamState	cps/http/shared/http3_connection.html#clearRequestStreamState,Http3Connection,uint64	proc clearRequestStreamState(conn: Http3Connection; streamId: uint64)		523
+nim	cancelPush	cps/http/shared/http3_connection.html#cancelPush,Http3Connection,uint64	proc cancelPush(conn: Http3Connection; pushId: uint64): seq[byte]		525
+nim	registerWebTransportSession	cps/http/shared/http3_connection.html#registerWebTransportSession,Http3Connection,uint64,string,string	proc registerWebTransportSession(conn: Http3Connection; streamId: uint64;\n                            authority: string; path: string): WebTransportSession		537
+nim	registerMasqueUdpSession	cps/http/shared/http3_connection.html#registerMasqueUdpSession,Http3Connection,uint64,string,string	proc registerMasqueUdpSession(conn: Http3Connection; streamId: uint64;\n                         authority: string; targetHostPort: string): MasqueSession		550
+nim	registerMasqueIpSession	cps/http/shared/http3_connection.html#registerMasqueIpSession,Http3Connection,uint64,string,string	proc registerMasqueIpSession(conn: Http3Connection; streamId: uint64;\n                        authority: string; targetIpPrefix: string): MasqueSession		559
+nim	processControlStreamData	cps/http/shared/http3_connection.html#processControlStreamData,Http3Connection,uint64,openArray[byte]	proc processControlStreamData(conn: Http3Connection; streamId: uint64;\n                         payload: openArray[byte]): seq[Http3Event]		1416
+nim	processRequestStreamData	cps/http/shared/http3_connection.html#processRequestStreamData,Http3Connection,uint64,openArray[byte],bool,Http3StreamRole	proc processRequestStreamData(conn: Http3Connection; streamId: uint64;\n                         payload: openArray[byte];\n                         allowInformationalHeaders: bool = false;\n                         streamRole: Http3StreamRole = h3srRequest): seq[\n    Http3Event]		1432
+nim	finalizeRequestStream	cps/http/shared/http3_connection.html#finalizeRequestStream,Http3Connection,uint64	proc finalizeRequestStream(conn: Http3Connection; streamId: uint64): seq[Http3Event]		1670
+nim	ingestUniStreamData	cps/http/shared/http3_connection.html#ingestUniStreamData,Http3Connection,uint64,openArray[byte]	proc ingestUniStreamData(conn: Http3Connection; streamId: uint64;\n                    payload: openArray[byte]): seq[Http3Event]		1688
+nim	finalizeRequestStream	cps/http/shared/http3_connection.html#finalizeRequestStream,Http3Connection,uint64,bool,Http3StreamRole	proc finalizeRequestStream(conn: Http3Connection; streamId: uint64;\n                      allowInformationalHeaders: bool;\n                      streamRole: Http3StreamRole = h3srRequest): seq[Http3Event]		1692
+nim	finalizeUniStream	cps/http/shared/http3_connection.html#finalizeUniStream,Http3Connection,uint64	proc finalizeUniStream(conn: Http3Connection; streamId: uint64): seq[Http3Event]		1712
+nim	requestStreamBufferedBytes	cps/http/shared/http3_connection.html#requestStreamBufferedBytes,Http3Connection,uint64	proc requestStreamBufferedBytes(conn: Http3Connection; streamId: uint64): int		1755
+nim	totalRequestBufferedBytes	cps/http/shared/http3_connection.html#totalRequestBufferedBytes,Http3Connection	proc totalRequestBufferedBytes(conn: Http3Connection): int		1761
+nim	totalUniBufferedBytes	cps/http/shared/http3_connection.html#totalUniBufferedBytes,Http3Connection	proc totalUniBufferedBytes(conn: Http3Connection): int		1767
+nim	encodeH3DatagramForWebTransport	cps/http/shared/http3_connection.html#encodeH3DatagramForWebTransport,Http3Connection,uint64,openArray[byte]	proc encodeH3DatagramForWebTransport(conn: Http3Connection; sessionStreamId: uint64;\n                                payload: openArray[byte]): seq[byte]		1975
+nim	encodeH3DatagramForMasque	cps/http/shared/http3_connection.html#encodeH3DatagramForMasque,Http3Connection,uint64,uint64,openArray[byte]	proc encodeH3DatagramForMasque(conn: Http3Connection; streamId: uint64;\n                          contextId: uint64; payload: openArray[byte]): seq[byte]		1982
+nim	ingestH3Datagram	cps/http/shared/http3_connection.html#ingestH3Datagram,Http3Connection,openArray[byte]	proc ingestH3Datagram(conn: Http3Connection; payload: openArray[byte]): bool		1992
+nim	hasMasqueSession	cps/http/shared/http3_connection.html#hasMasqueSession,Http3Connection,uint64	proc hasMasqueSession(conn: Http3Connection; streamId: uint64): bool		2020
+nim	hasWebTransportSession	cps/http/shared/http3_connection.html#hasWebTransportSession,Http3Connection,uint64	proc hasWebTransportSession(conn: Http3Connection; streamId: uint64): bool		2026
+nim	ingestMasqueCapsuleData	cps/http/shared/http3_connection.html#ingestMasqueCapsuleData,Http3Connection,uint64,openArray[byte]	proc ingestMasqueCapsuleData(conn: Http3Connection; streamId: uint64;\n                        payload: openArray[byte]): bool		2032
+nim	clearMasqueSessionState	cps/http/shared/http3_connection.html#clearMasqueSessionState,Http3Connection,uint64	proc clearMasqueSessionState(conn: Http3Connection; streamId: uint64)		2067
+nim	clearWebTransportSessionState	cps/http/shared/http3_connection.html#clearWebTransportSessionState,Http3Connection,uint64	proc clearWebTransportSessionState(conn: Http3Connection; streamId: uint64)		2076
+nim	popWebTransportOutgoingDatagrams	cps/http/shared/http3_connection.html#popWebTransportOutgoingDatagrams,Http3Connection	proc popWebTransportOutgoingDatagrams(conn: Http3Connection): seq[seq[byte]]		2083
+nim	popMasqueOutgoingDatagrams	cps/http/shared/http3_connection.html#popMasqueOutgoingDatagrams,Http3Connection	proc popMasqueOutgoingDatagrams(conn: Http3Connection): seq[seq[byte]]		2090
+nim	popMasqueOutgoingCapsulesByStream	cps/http/shared/http3_connection.html#popMasqueOutgoingCapsulesByStream,Http3Connection	proc popMasqueOutgoingCapsulesByStream(conn: Http3Connection): seq[\n    tuple[streamId: uint64, capsules: seq[MasqueCapsule]]]		2097
+nim	popMasqueOutgoingCapsules	cps/http/shared/http3_connection.html#popMasqueOutgoingCapsules,Http3Connection	proc popMasqueOutgoingCapsules(conn: Http3Connection): seq[MasqueCapsule]		2104
+nimgrp	finalizerequeststream	cps/http/shared/http3_connection.html#finalizeRequestStream-procs-all	proc		1670

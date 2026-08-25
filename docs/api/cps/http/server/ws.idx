@@ -1,0 +1,5 @@
+nimTitle	ws	cps/http/server/ws.html	module cps/http/server/ws		0
+nim	wsResponse	cps/http/server/ws.html#wsResponse	proc wsResponse(): HttpResponseBuilder		56
+nim	acceptWebSocket	cps/http/server/ws.html#acceptWebSocket,AsyncStream,BufferedReader,HttpRequest,seq[]	proc acceptWebSocket(stream: AsyncStream; reader: BufferedReader; req: HttpRequest;\n                extraHeaders: seq[(string, string)] = @[]): CpsFuture[WebSocket]		61
+nim	acceptWebSocket	cps/http/server/ws.html#acceptWebSocket,HttpRequest,seq[]	proc acceptWebSocket(req: HttpRequest; extraHeaders: seq[(string, string)] = @[]): CpsFuture[\n    WebSocket]		210
+nimgrp	acceptwebsocket	cps/http/server/ws.html#acceptWebSocket-procs-all	proc		61

@@ -1,0 +1,9 @@
+nimTitle	metrics	cps/http/middleware/metrics.html	module cps/http/middleware/metrics		0
+nim	MetricsCollector	cps/http/middleware/metrics.html#MetricsCollector	type MetricsCollector		20
+nim	newMetricsCollector	cps/http/middleware/metrics.html#newMetricsCollector	proc newMetricsCollector(): MetricsCollector		25
+nim	newMetricsCollector	cps/http/middleware/metrics.html#newMetricsCollector,seq[float]	proc newMetricsCollector(buckets: seq[float]): MetricsCollector		33
+nim	record	cps/http/middleware/metrics.html#record,MetricsCollector,string,string,int,float	proc record(collector: MetricsCollector; meth, pattern: string; status: int;\n       durationMs: float)		41
+nim	renderPrometheus	cps/http/middleware/metrics.html#renderPrometheus,MetricsCollector	proc renderPrometheus(collector: MetricsCollector): string		67
+nim	metricsMiddleware	cps/http/middleware/metrics.html#metricsMiddleware,MetricsCollector	proc metricsMiddleware(collector: MetricsCollector): Middleware		102
+nim	metricsHandler	cps/http/middleware/metrics.html#metricsHandler,MetricsCollector	proc metricsHandler(collector: MetricsCollector): HttpHandler		128
+nimgrp	newmetricscollector	cps/http/middleware/metrics.html#newMetricsCollector-procs-all	proc		25

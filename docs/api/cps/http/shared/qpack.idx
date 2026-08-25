@@ -1,0 +1,38 @@
+nimTitle	qpack	cps/http/shared/qpack.html	module cps/http/shared/qpack		0
+nim	QpackHeaderField	cps/http/shared/qpack.html#QpackHeaderField	tuple QpackHeaderField		7
+nim	qdikSectionAck	cps/http/shared/qpack.html#qdikSectionAck	QpackDecoderInstructionKind.qdikSectionAck		9
+nim	qdikStreamCancel	cps/http/shared/qpack.html#qdikStreamCancel	QpackDecoderInstructionKind.qdikStreamCancel		9
+nim	qdikInsertCountIncrement	cps/http/shared/qpack.html#qdikInsertCountIncrement	QpackDecoderInstructionKind.qdikInsertCountIncrement		9
+nim	QpackDecoderInstructionKind	cps/http/shared/qpack.html#QpackDecoderInstructionKind	enum QpackDecoderInstructionKind		9
+nim	QpackDecoderInstruction	cps/http/shared/qpack.html#QpackDecoderInstruction	object QpackDecoderInstruction		14
+nim	qeikInsertLiteral	cps/http/shared/qpack.html#qeikInsertLiteral	QpackEncoderInstructionKind.qeikInsertLiteral		23
+nim	qeikInsertNameRef	cps/http/shared/qpack.html#qeikInsertNameRef	QpackEncoderInstructionKind.qeikInsertNameRef		23
+nim	qeikDuplicate	cps/http/shared/qpack.html#qeikDuplicate	QpackEncoderInstructionKind.qeikDuplicate		23
+nim	qeikSetCapacity	cps/http/shared/qpack.html#qeikSetCapacity	QpackEncoderInstructionKind.qeikSetCapacity		23
+nim	QpackEncoderInstructionKind	cps/http/shared/qpack.html#QpackEncoderInstructionKind	enum QpackEncoderInstructionKind		23
+nim	QpackEncoderInstruction	cps/http/shared/qpack.html#QpackEncoderInstruction	object QpackEncoderInstruction		29
+nim	QpackEncoder	cps/http/shared/qpack.html#QpackEncoder	type QpackEncoder		42
+nim	QpackDecoder	cps/http/shared/qpack.html#QpackDecoder	type QpackDecoder		50
+nim	QpackStaticTable	cps/http/shared/qpack.html#QpackStaticTable	const QpackStaticTable		61
+nim	newQpackEncoder	cps/http/shared/qpack.html#newQpackEncoder,int,int	proc newQpackEncoder(maxTableCapacity: int = 4096; blockedStreamsLimit: int = 16): QpackEncoder		102
+nim	newQpackDecoder	cps/http/shared/qpack.html#newQpackDecoder,int,int	proc newQpackDecoder(maxTableCapacity: int = 4096; blockedStreamsLimit: int = 16): QpackDecoder		113
+nim	markBlocked	cps/http/shared/qpack.html#markBlocked,QpackEncoder	proc markBlocked(enc: QpackEncoder)		216
+nim	markUnblocked	cps/http/shared/qpack.html#markUnblocked,QpackEncoder	proc markUnblocked(enc: QpackEncoder)		221
+nim	markBlocked	cps/http/shared/qpack.html#markBlocked,QpackDecoder	proc markBlocked(dec: QpackDecoder)		226
+nim	markUnblocked	cps/http/shared/qpack.html#markUnblocked,QpackDecoder	proc markUnblocked(dec: QpackDecoder)		231
+nim	encodeHeaders	cps/http/shared/qpack.html#encodeHeaders,QpackEncoder,openArray[QpackHeaderField]	proc encodeHeaders(enc: QpackEncoder; headers: openArray[QpackHeaderField]): seq[byte]		246
+nim	decodeHeaders	cps/http/shared/qpack.html#decodeHeaders,QpackDecoder,openArray[byte]	proc decodeHeaders(dec: QpackDecoder; encoded: openArray[byte]): seq[QpackHeaderField]		270
+nim	encodeHeadersRfcWireWithInstructions	cps/http/shared/qpack.html#encodeHeadersRfcWireWithInstructions,QpackEncoder,openArray[QpackHeaderField],seq[QpackEncoderInstruction]	proc encodeHeadersRfcWireWithInstructions(enc: QpackEncoder;\n                                     headers: openArray[QpackHeaderField];\n    emittedInstructions: var seq[QpackEncoderInstruction]): seq[byte]		447
+nim	encodeHeadersRfcWire	cps/http/shared/qpack.html#encodeHeadersRfcWire,QpackEncoder,openArray[QpackHeaderField]	proc encodeHeadersRfcWire(enc: QpackEncoder; headers: openArray[QpackHeaderField]): seq[\n    byte]		515
+nim	decodeHeadersRfcWire	cps/http/shared/qpack.html#decodeHeadersRfcWire,QpackDecoder,openArray[byte]	proc decodeHeadersRfcWire(dec: QpackDecoder; encoded: openArray[byte]): seq[\n    QpackHeaderField]		520
+nim	encodeEncoderInstruction	cps/http/shared/qpack.html#encodeEncoderInstruction,QpackEncoderInstruction	proc encodeEncoderInstruction(inst: QpackEncoderInstruction): seq[byte]		593
+nim	decodeEncoderInstructionPrefix	cps/http/shared/qpack.html#decodeEncoderInstructionPrefix,openArray[byte],int	proc decodeEncoderInstructionPrefix(payload: openArray[byte]; offset: var int): QpackEncoderInstruction		620
+nim	decodeEncoderInstruction	cps/http/shared/qpack.html#decodeEncoderInstruction,openArray[byte]	proc decodeEncoderInstruction(payload: openArray[byte]): QpackEncoderInstruction		683
+nim	applyEncoderInstruction	cps/http/shared/qpack.html#applyEncoderInstruction,QpackDecoder,QpackEncoderInstruction	proc applyEncoderInstruction(dec: QpackDecoder; inst: QpackEncoderInstruction)		690
+nim	encodeDecoderInstruction	cps/http/shared/qpack.html#encodeDecoderInstruction,QpackDecoderInstruction	proc encodeDecoderInstruction(inst: QpackDecoderInstruction): seq[byte]		720
+nim	decodeDecoderInstructionPrefix	cps/http/shared/qpack.html#decodeDecoderInstructionPrefix,openArray[byte],int	proc decodeDecoderInstructionPrefix(payload: openArray[byte]; offset: var int): QpackDecoderInstruction		734
+nim	decodeDecoderInstruction	cps/http/shared/qpack.html#decodeDecoderInstruction,openArray[byte]	proc decodeDecoderInstruction(payload: openArray[byte]): QpackDecoderInstruction		768
+nim	applyDecoderInstruction	cps/http/shared/qpack.html#applyDecoderInstruction,QpackEncoder,QpackDecoderInstruction	proc applyDecoderInstruction(enc: QpackEncoder; inst: QpackDecoderInstruction)		775
+nim	encodeEncoderInsertInstruction	cps/http/shared/qpack.html#encodeEncoderInsertInstruction,string,string	proc encodeEncoderInsertInstruction(name: string; value: string): seq[byte]		791
+nimgrp	markblocked	cps/http/shared/qpack.html#markBlocked-procs-all	proc		216
+nimgrp	markunblocked	cps/http/shared/qpack.html#markUnblocked-procs-all	proc		221

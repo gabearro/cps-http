@@ -1,0 +1,6 @@
+nimTitle	webtransport	cps/http/server/webtransport.html	module cps/http/server/webtransport		0
+nim	WebTransportPolicyHook	cps/http/server/webtransport.html#WebTransportPolicyHook	type WebTransportPolicyHook		8
+nim	WebTransportSessionHandler	cps/http/server/webtransport.html#WebTransportSessionHandler	type WebTransportSessionHandler		9
+nim	acceptWebTransportSession	cps/http/server/webtransport.html#acceptWebTransportSession,uint64,string,string,string,WebTransportPolicyHook,WebTransportSessionHandler	proc acceptWebTransportSession(sessionId: uint64; authority: string; path: string;\n                          origin: string = "";\n                          policyHook: WebTransportPolicyHook = nil;\n                          handler: WebTransportSessionHandler = nil): CpsFuture[\n    WebTransportSession]		2410
+nim	parseConnectRequest	cps/http/server/webtransport.html#parseConnectRequest,openArray[]	proc parseConnectRequest(headers: openArray[(string, string)]): wt_shared.WebTransportConnectRequest		26
+nim	isWebTransportConnectRequest	cps/http/server/webtransport.html#isWebTransportConnectRequest,openArray[]	proc isWebTransportConnectRequest(headers: openArray[(string, string)]): bool		30
