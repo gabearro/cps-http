@@ -657,6 +657,9 @@ proc pendingRequestStreamIds*(session: Http3ServerSession): seq[uint64] =
 proc hasPendingRequestStream*(session: Http3ServerSession, streamId: uint64): bool =
   streamId in session.pendingRequests
 
+proc hasPendingRequests*(session: Http3ServerSession): bool {.inline.} =
+  not session.isNil and session.pendingRequests.len > 0
+
 proc qpackBlockedRequestStreamIds*(session: Http3ServerSession): seq[uint64] =
   for streamId in session.qpackBlockedRequestStreams.keys:
     result.add streamId

@@ -7,7 +7,10 @@ if defined(useBoringSSL):
   switch("passL", "-lssl")
   switch("passL", "-lcrypto")
   switch("passC", "-Ideps/boringssl/include")
-  switch("passL", "-lc++")
+  when defined(macosx):
+    switch("passL", "-lc++")
+  else:
+    switch("passL", "-lstdc++")
 elif defined(macosx):
   switch("dynlibOverride", "libssl.3.dylib")
   switch("dynlibOverride", "libcrypto.3.dylib")
@@ -20,4 +23,3 @@ elif defined(linux):
   switch("dynlibOverride", "libcrypto.so")
   switch("passL", "-lssl")
   switch("passL", "-lcrypto")
-

@@ -51,8 +51,8 @@ mkdir -p "$INSTALL_DIR/lib"
 mkdir -p "$INSTALL_DIR/include"
 
 # Copy static libraries
-cp ssl/libssl.a "$INSTALL_DIR/lib/"
-cp crypto/libcrypto.a "$INSTALL_DIR/lib/"
+cp libssl.a "$INSTALL_DIR/lib/"
+cp libcrypto.a "$INSTALL_DIR/lib/"
 
 # Copy headers
 cp -r "$BUILD_DIR/include/openssl" "$INSTALL_DIR/include/"

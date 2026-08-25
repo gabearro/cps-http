@@ -7,6 +7,7 @@ import std/[strutils, tables]
 import cps/runtime
 import cps/transform
 import cps/io/streams
+import cps/io/tcp
 import cps/io/buffered
 import cps/io/timeouts
 import ./types
@@ -28,6 +29,34 @@ type
     stream*: AsyncStream
     reader*: BufferedReader
     config*: HttpServerConfig
+
+  Http1SpecialHeader = enum
+    h1hOther, h1hHost, h1hExpect, h1hConnection,
+    h1hContentLength, h1hTransferEncoding
+
+const
+  H1Empty200KeepAliveResponse =
+    "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: keep-alive\r\n\r\n"
+  H1Empty200CloseResponse =
+    "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+
+proc classifySpecialHeader(name: string): Http1SpecialHeader {.inline.} =
+  ## Dispatch common semantic headers by length first. This keeps arbitrary
+  ## extension headers on the generic path while avoiding five full
+  ## case-insensitive comparisons for every header line.
+  case name.len
+  of 4:
+    if eqCaseInsensitive(name, "host"): h1hHost else: h1hOther
+  of 6:
+    if eqCaseInsensitive(name, "expect"): h1hExpect else: h1hOther
+  of 10:
+    if eqCaseInsensitive(name, "connection"): h1hConnection else: h1hOther
+  of 14:
+    if eqCaseInsensitive(name, "content-length"): h1hContentLength else: h1hOther
+  of 17:
+    if eqCaseInsensitive(name, "transfer-encoding"): h1hTransferEncoding else: h1hOther
+  else:
+    h1hOther
 
 proc raiseRequestError(statusCode: int, msg: string) =
   var err = newException(Http1RequestError, msg)
@@ -274,11 +303,12 @@ proc parseHeaderBlock(headerBlock: string, config: HttpServerConfig): HeaderPars
     if not validateHeaderPair(rawKey, val):
       return HeaderParseResult(ok: false, statusCode: 400, errBody: "Bad Request")
 
-    if eqCaseInsensitive(rawKey, "host"):
+    case classifySpecialHeader(rawKey)
+    of h1hHost:
       if val.len == 0:
         return HeaderParseResult(ok: false, statusCode: 400, errBody: "Bad Request")
       inc hostHeaderCount
-    elif eqCaseInsensitive(rawKey, "content-length"):
+    of h1hContentLength:
       var parsedLen = 0
       if not parseContentLengthValue(val, parsedLen):
         return HeaderParseResult(ok: false, statusCode: 400, errBody: "Bad Request")
@@ -286,19 +316,21 @@ proc parseHeaderBlock(headerBlock: string, config: HttpServerConfig): HeaderPars
         return HeaderParseResult(ok: false, statusCode: 400, errBody: "Bad Request")
       result.sawContentLength = true
       result.parsedContentLength = parsedLen
-    elif eqCaseInsensitive(rawKey, "transfer-encoding"):
+    of h1hTransferEncoding:
       if result.transferEncoding.len > 0:
         result.transferEncoding.add(",")
       result.transferEncoding.add(val)
-    elif eqCaseInsensitive(rawKey, "expect"):
+    of h1hExpect:
       if expectHeader.len > 0:
         expectHeader.add(",")
       expectHeader.add(val)
-    elif eqCaseInsensitive(rawKey, "connection"):
+    of h1hConnection:
       if headerHasToken(val, "close"):
         result.hasConnectionClose = true
       if headerHasToken(val, "keep-alive"):
         result.hasConnectionKeepAlive = true
+    of h1hOther:
+      discard
     result.headers.add (rawKey, val)
 
     pos = hEnd + 2  # skip \r\n
@@ -454,20 +486,24 @@ proc parseRequestResultWithBody(stream: AsyncStream, reader: BufferedReader,
     hasConnectionClose: hdr.hasConnectionClose,
     hasConnectionKeepAlive: hdr.hasConnectionKeepAlive)
 
-proc processHeaderBlock(headerBlock: string, config: HttpServerConfig,
-                        stream: AsyncStream, reader: BufferedReader,
-                        remoteAddr: string): CpsFuture[ParseRequestResult] =
+proc processHeaderBlockPoll(headerBlock: string, config: HttpServerConfig,
+                            stream: AsyncStream, reader: BufferedReader,
+                            remoteAddr: string,
+                            parsed: ptr ParseRequestResult): CpsFuture[ParseRequestResult] =
   ## Process a complete header block into a ParseRequestResult.
-  ## For no-body requests: returns a pre-completed future (no CPS overhead).
-  ## For body requests: delegates to CPS proc.
+  ## Returns nil with `parsed` populated for synchronous results. Body-bearing
+  ## requests return the future that will finish the remaining async work.
   if headerBlock.len == 0:
-    return completedFuture(ParseRequestResult(closeConn: true))
+    parsed[] = ParseRequestResult(closeConn: true)
+    return nil
 
   let hdr = parseHeaderBlock(headerBlock, config)
   if not hdr.ok:
     if hdr.statusCode == 0:
-      return completedFuture(ParseRequestResult(closeConn: true))
-    return completedFuture(ParseRequestResult(statusCode: hdr.statusCode, errBody: hdr.errBody))
+      parsed[] = ParseRequestResult(closeConn: true)
+    else:
+      parsed[] = ParseRequestResult(statusCode: hdr.statusCode, errBody: hdr.errBody)
+    return nil
 
   # Check if body reading is needed
   let needsBody = hdr.transferEncoding.len > 0 or
@@ -488,21 +524,33 @@ proc processHeaderBlock(headerBlock: string, config: HttpServerConfig,
     reader: reader,
     context: nil
   )
-  return completedFuture(ParseRequestResult(ok: true, req: req,
+  parsed[] = ParseRequestResult(ok: true, req: req,
     hasConnectionClose: hdr.hasConnectionClose,
-    hasConnectionKeepAlive: hdr.hasConnectionKeepAlive))
+    hasConnectionKeepAlive: hdr.hasConnectionKeepAlive)
+  return nil
 
-proc parseRequestResult(stream: AsyncStream, reader: BufferedReader,
-                        config: HttpServerConfig,
-                        remoteAddr: string = ""): CpsFuture[ParseRequestResult] =
+proc processHeaderBlock(headerBlock: string, config: HttpServerConfig,
+                        stream: AsyncStream, reader: BufferedReader,
+                        remoteAddr: string): CpsFuture[ParseRequestResult] =
+  ## Compatibility wrapper for callers that always consume a Future.
+  var parsed: ParseRequestResult
+  result = processHeaderBlockPoll(
+    headerBlock, config, stream, reader, remoteAddr, addr parsed)
+  if result.isNil:
+    result = completedFuture(parsed)
+
+proc parseRequestResultPoll(stream: AsyncStream, reader: BufferedReader,
+                            config: HttpServerConfig, remoteAddr: string,
+                            parsed: ptr ParseRequestResult): CpsFuture[ParseRequestResult] =
   ## Parse an HTTP/1.1 request. Avoids CPS env allocation for the common case
-  ## (no-body requests with headers already in the buffer).
+  ## and returns nil with `parsed` populated when it finishes synchronously.
   let maxHeaderSize = if config.maxHeaderBytes > 0: config.maxHeaderBytes else: 65536
 
   # Ultra-fast path: search buffer directly, bypass readUntilHeaderEnd's CpsFuture
   var idx = reader.searchHeaderEnd()
   if idx >= 0:
-    return processHeaderBlock(reader.extractHeaderBlock(idx), config, stream, reader, remoteAddr)
+    return processHeaderBlockPoll(
+      reader.extractHeaderBlock(idx), config, stream, reader, remoteAddr, parsed)
 
   # Try one sync fill, then check again (common for keep-alive)
   if not reader.atEof():
@@ -511,11 +559,14 @@ proc parseRequestResult(stream: AsyncStream, reader: BufferedReader,
       if not fillFut.hasError():
         idx = reader.searchHeaderEnd()
         if idx >= 0:
-          return processHeaderBlock(reader.extractHeaderBlock(idx), config, stream, reader, remoteAddr)
+          return processHeaderBlockPoll(
+            reader.extractHeaderBlock(idx), config, stream, reader, remoteAddr, parsed)
         if reader.atEof():
-          return completedFuture(ParseRequestResult(closeConn: true))
+          parsed[] = ParseRequestResult(closeConn: true)
+          return nil
       else:
-        return completedFuture(ParseRequestResult(closeConn: true))
+        parsed[] = ParseRequestResult(closeConn: true)
+        return nil
     else:
       # fillBuffer is pending (EAGAIN) — wait for data, then use readUntilHeaderEnd
       let resultFut = newCpsFuture[ParseRequestResult]()
@@ -574,7 +625,8 @@ proc parseRequestResult(stream: AsyncStream, reader: BufferedReader,
 
   # EOF with no data
   if reader.atEof():
-    return completedFuture(ParseRequestResult(closeConn: true))
+    parsed[] = ParseRequestResult(closeConn: true)
+    return nil
 
   # Fall back to full readUntilHeaderEnd (for edge cases)
   let headerFut = applyReadTimeout(reader.readUntilHeaderEnd(maxHeaderSize), config.readTimeoutMs)
@@ -582,9 +634,12 @@ proc parseRequestResult(stream: AsyncStream, reader: BufferedReader,
     if headerFut.hasError():
       let err = headerFut.getError()
       if err of TimeoutError:
-        return completedFuture(ParseRequestResult(statusCode: 408, errBody: "Request Timeout"))
-      return completedFuture(ParseRequestResult(closeConn: true))
-    return processHeaderBlock(headerFut.read(), config, stream, reader, remoteAddr)
+        parsed[] = ParseRequestResult(statusCode: 408, errBody: "Request Timeout")
+      else:
+        parsed[] = ParseRequestResult(closeConn: true)
+      return nil
+    return processHeaderBlockPoll(
+      headerFut.read(), config, stream, reader, remoteAddr, parsed)
 
   let resultFut = newCpsFuture[ParseRequestResult]()
   headerFut.addCallback(proc() =
@@ -610,6 +665,15 @@ proc parseRequestResult(stream: AsyncStream, reader: BufferedReader,
         )
   )
   return resultFut
+
+proc parseRequestResult(stream: AsyncStream, reader: BufferedReader,
+                        config: HttpServerConfig,
+                        remoteAddr: string = ""): CpsFuture[ParseRequestResult] =
+  ## Future-returning compatibility API used outside the connection driver.
+  var parsed: ParseRequestResult
+  result = parseRequestResultPoll(stream, reader, config, remoteAddr, addr parsed)
+  if result.isNil:
+    result = completedFuture(parsed)
 
 proc parseRequest*(stream: AsyncStream, reader: BufferedReader,
                    config: HttpServerConfig,
@@ -740,14 +804,21 @@ proc handleHttp1Connection*(stream: AsyncStream, config: HttpServerConfig,
                             remoteAddr: string = ""): CpsVoidFuture {.cps.} =
   ## Handle an HTTP/1.1 connection: parse requests in a loop, call the
   ## handler, and write responses. Honors Connection: close.
-  let reader = newBufferedReader(stream)
+  let initialBufferBytes =
+    if config.initialReadBufferBytes > 0: config.initialReadBufferBytes
+    else: 2048
+  let reader = newBufferedReader(stream, initialBufferBytes)
+  var canCloseImmediately = false
   while true:
     var req: HttpRequest
     var hasRequest = false
     var closeConn = false
     var parseErrStatus = 0
     var parseErrBody = ""
-    let parsed = await parseRequestResult(stream, reader, config, remoteAddr)
+    var parsed: ParseRequestResult
+    let parsedFut = parseRequestResultPoll(stream, reader, config, remoteAddr, addr parsed)
+    if parsedFut != nil:
+      parsed = await parsedFut
     if parsed.ok:
       req = parsed.req
       hasRequest = true
@@ -786,7 +857,10 @@ proc handleHttp1Connection*(stream: AsyncStream, config: HttpServerConfig,
     let reqClose = parsed.hasConnectionClose
     let reqKeepAlive = parsed.hasConnectionKeepAlive
     let shouldCloseAfterResponse = reqClose or (req.httpVersion == "HTTP/1.0" and not reqKeepAlive)
-    if shouldCloseAfterResponse:
+    let isHeadRequest = eqCaseInsensitive(req.meth, "HEAD")
+    let plainOkResponse = resp.statusCode == 200 and resp.headers.len == 0 and
+                          not isHeadRequest
+    if shouldCloseAfterResponse and not plainOkResponse:
       removeHeadersByName(resp.headers, "connection")
       resp.headers.add(("Connection", "close"))
     elif not headersContainName(resp.headers, "connection"):
@@ -801,17 +875,25 @@ proc handleHttp1Connection*(stream: AsyncStream, config: HttpServerConfig,
 
     var writeFailed = false
     try:
-      # Fast path: 200 OK, no custom headers, keep-alive, not HEAD
-      if resp.statusCode == 200 and resp.headers.len == 0 and
-         not shouldCloseAfterResponse and not eqCaseInsensitive(req.meth, "HEAD"):
-        var s = newStringOfCap(64 + resp.body.len)
-        s.add "HTTP/1.1 200 OK\r\nContent-Length: "
-        s.addInt(resp.body.len)
-        s.add "\r\nConnection: keep-alive\r\n\r\n"
-        s.add resp.body
-        await stream.write(s)
+      # Common plain-response path: avoid header validation, iteration, and
+      # response mutation when no custom metadata is present.
+      if plainOkResponse:
+        if resp.body.len == 0:
+          if shouldCloseAfterResponse:
+            await stream.write(H1Empty200CloseResponse)
+          else:
+            await stream.write(H1Empty200KeepAliveResponse)
+        else:
+          var s = newStringOfCap(64 + resp.body.len)
+          s.add "HTTP/1.1 200 OK\r\nContent-Length: "
+          s.addInt(resp.body.len)
+          if shouldCloseAfterResponse:
+            s.add "\r\nConnection: close\r\n\r\n"
+          else:
+            s.add "\r\nConnection: keep-alive\r\n\r\n"
+          s.add resp.body
+          await stream.write(s)
       else:
-        let isHeadRequest = eqCaseInsensitive(req.meth, "HEAD")
         if isHeadRequest:
           let hint = headBodyLengthHint(resp)
           await writeResponse(stream, resp, sendBody = false, bodyLengthHint = hint)
@@ -823,10 +905,15 @@ proc handleHttp1Connection*(stream: AsyncStream, config: HttpServerConfig,
       break
 
     if shouldCloseAfterResponse:
+      canCloseImmediately = true
       break
 
     # Respect explicit close from response.
     if headersHaveToken(resp.headers, "connection", "close"):
+      canCloseImmediately = true
       break
 
-  stream.close()
+  if canCloseImmediately and stream of TcpStream:
+    TcpStream(stream).closeImmediately()
+  else:
+    stream.close()

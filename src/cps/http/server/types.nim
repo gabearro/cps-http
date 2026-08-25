@@ -65,6 +65,10 @@ type
     quicInitialMaxStreamsBidi*: uint64
     quicInitialMaxStreamsUni*: uint64
     maxConnections*: int
+    reusePort*: bool
+    deferAcceptSeconds*: int
+    tcpNoDelay*: bool
+    initialReadBufferBytes*: int
     maxRequestBodySize*: int
     readTimeoutMs*: int
     maxRequestLineSize*: int
@@ -288,6 +292,10 @@ proc newHttpServer*(handler: HttpHandler,
                     quicInitialMaxStreamsBidi: uint64 = 100'u64,
                     quicInitialMaxStreamsUni: uint64 = 100'u64,
                     maxConnections: int = 1000,
+                    reusePort: bool = false,
+                    deferAcceptSeconds: int = 1,
+                    tcpNoDelay: bool = true,
+                    initialReadBufferBytes: int = 2048,
                     maxRequestBodySize: int = 10 * 1024 * 1024,
                     readTimeoutMs: int = 30000,
                     maxRequestLineSize: int = 8 * 1024,
@@ -318,6 +326,10 @@ proc newHttpServer*(handler: HttpHandler,
     quicInitialMaxStreamsBidi: quicInitialMaxStreamsBidi,
     quicInitialMaxStreamsUni: quicInitialMaxStreamsUni,
     maxConnections: maxConnections,
+    reusePort: reusePort,
+    deferAcceptSeconds: deferAcceptSeconds,
+    tcpNoDelay: tcpNoDelay,
+    initialReadBufferBytes: initialReadBufferBytes,
     maxRequestBodySize: maxRequestBodySize,
     readTimeoutMs: readTimeoutMs,
     maxRequestLineSize: maxRequestLineSize,
@@ -343,7 +355,13 @@ proc getPort*(server: HttpServer): int =
 
 proc bindAndListen*(server: HttpServer) =
   ## Bind and listen. Call before start().
-  server.listener = tcpListen(server.config.host, server.config.port)
+  server.listener = tcpListen(
+    server.config.host,
+    server.config.port,
+    reusePort = server.config.reusePort,
+    deferAcceptSeconds = server.config.deferAcceptSeconds,
+    noDelay = server.config.tcpNoDelay
+  )
   # Get the actual bound port
   var localAddr: Sockaddr_in
   var addrLen: SockLen = sizeof(localAddr).SockLen

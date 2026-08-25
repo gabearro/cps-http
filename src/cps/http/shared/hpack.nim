@@ -278,7 +278,7 @@ const HuffmanTable*: array[257, (uint32, uint8)] = [
   (0x79'u32, 7'u8),        # 120 'x'
   (0x7a'u32, 7'u8),        # 121 'y'
   (0x7b'u32, 7'u8),        # 122 'z'
-  (0x7fffe'u32, 19'u8),    # 123 '{'
+  (0x7ffe'u32, 15'u8),     # 123 '{'
   (0x7fc'u32, 11'u8),      # 124 '|'
   (0x3ffd'u32, 14'u8),     # 125 '}'
   (0x1ffd'u32, 13'u8),     # 126 '~'
@@ -414,45 +414,107 @@ const HuffmanTable*: array[257, (uint32, uint8)] = [
   (0x3fffffff'u32, 30'u8), # 256 EOS
 ]
 
+type HuffmanDecodeNode = object
+  ## Child indexes and symbols are stored plus one so zero remains the compact
+  ## "not present" sentinel in the compile-time table.
+  child: array[2, uint16]
+  symbol: uint16
+
+type HuffmanNibbleTransition = object
+  ## `nextNode == high(uint16)` is the invalid-code/EOS sentinel. Symbols are
+  ## stored plus one so zero means that this nibble emits no byte.
+  nextNode: uint16
+  symbol: uint16
+
+const HuffmanDecodeNodeCapacity = 1024
+
+func buildHuffmanDecodeTrie(): array[HuffmanDecodeNodeCapacity, HuffmanDecodeNode] =
+  var nextNode = 1
+  for sym in 0 ..< HuffmanTable.len:
+    let (code, codeLen) = HuffmanTable[sym]
+    var node = 0
+    for bitPos in countdown(int(codeLen) - 1, 0):
+      let bit = int((code shr bitPos) and 1'u32)
+      let encodedChild = result[node].child[bit]
+      if encodedChild == 0'u16:
+        doAssert nextNode < HuffmanDecodeNodeCapacity
+        result[node].child[bit] = uint16(nextNode + 1)
+        node = nextNode
+        inc nextNode
+      else:
+        node = int(encodedChild) - 1
+    result[node].symbol = uint16(sym + 1)
+
+const HuffmanDecodeTrie = buildHuffmanDecodeTrie()
+
+func buildHuffmanNibbleTable(
+    trie: array[HuffmanDecodeNodeCapacity, HuffmanDecodeNode]
+): array[HuffmanDecodeNodeCapacity, array[16, HuffmanNibbleTransition]] =
+  ## Four bits cannot contain two complete HPACK symbols (the shortest code is
+  ## five bits), so each transition needs room for at most one output byte.
+  for startNode in 0 ..< HuffmanDecodeNodeCapacity:
+    for nibble in 0 .. 15:
+      var node = startNode
+      var emitted = 0'u16
+      var valid = true
+      for bitPos in countdown(3, 0):
+        let bit = (nibble shr bitPos) and 1
+        let encodedChild = trie[node].child[bit]
+        if encodedChild == 0'u16:
+          valid = false
+          break
+        node = int(encodedChild) - 1
+        let encodedSymbol = trie[node].symbol
+        if encodedSymbol != 0'u16:
+          if encodedSymbol == 257'u16: # RFC7541 EOS
+            valid = false
+            break
+          doAssert emitted == 0'u16
+          emitted = encodedSymbol
+          node = 0
+      result[startNode][nibble] = HuffmanNibbleTransition(
+        nextNode: if valid: uint16(node) else: high(uint16),
+        symbol: if valid: emitted else: 0'u16
+      )
+
+func buildHuffmanPaddingNodes(
+    trie: array[HuffmanDecodeNodeCapacity, HuffmanDecodeNode]
+): array[HuffmanDecodeNodeCapacity, bool] =
+  ## Legal padding is at most seven one-bits and therefore a prefix of EOS.
+  var node = 0
+  for _ in 1 .. 7:
+    let encodedChild = trie[node].child[1]
+    doAssert encodedChild != 0'u16
+    node = int(encodedChild) - 1
+    result[node] = true
+
+const
+  HuffmanNibbleTable = buildHuffmanNibbleTable(HuffmanDecodeTrie)
+  HuffmanPaddingNodes = buildHuffmanPaddingNodes(HuffmanDecodeTrie)
+
 proc huffmanDecode*(data: openArray[byte], startOffset: int, length: int): string =
   ## Decode Huffman-encoded bytes per RFC 7541 Appendix B.
-  ## Uses bit-by-bit traversal against the Huffman table.
+  ## A compile-time nibble transition table decodes four bits per lookup while
+  ## retaining the trie state needed to validate EOS and padding.
   if startOffset < 0 or length < 0 or (startOffset + length) > data.len:
     raise newException(ValueError, "HPACK Huffman decode bounds invalid")
-  result = ""
-  var bits: uint64 = 0
-  var bitsAvail = 0
+  result = newStringOfCap((length * 8 + 4) div 5)
+  var node = 0
 
-  for i in 0 ..< length:
-    bits = (bits shl 8) or uint64(data[startOffset + i])
-    bitsAvail += 8
+  for byteIdx in 0 ..< length:
+    let input = data[startOffset + byteIdx]
+    for shift in [4, 0]:
+      let transition = HuffmanNibbleTable[node][int((input shr shift) and 0x0F'u8)]
+      if transition.nextNode == high(uint16):
+        raise newException(ValueError, "HPACK Huffman code invalid")
+      node = int(transition.nextNode)
+      if transition.symbol != 0'u16:
+        result.add char(int(transition.symbol) - 1)
 
-    # Try to decode symbols while we have enough bits
-    while bitsAvail >= 5:  # Shortest code is 5 bits
-      var found = false
-      for sym in 0 ..< 256:
-        let (code, codeLen) = HuffmanTable[sym]
-        if int(codeLen) <= bitsAvail:
-          # Check if the top codeLen bits match this symbol's code
-          let shift = bitsAvail - int(codeLen)
-          let candidate = uint32((bits shr shift) and ((1'u64 shl codeLen) - 1))
-          if candidate == code:
-            result.add char(sym)
-            bitsAvail -= int(codeLen)
-            bits = bits and ((1'u64 shl bitsAvail) - 1)
-            found = true
-            break
-      if not found:
-        break  # Need more bits
-
-  # RFC7541 section 5.2: trailing bits must be a prefix of EOS (all 1 bits),
-  # which means at most 7 bits and each remaining bit set to 1.
-  if bitsAvail > 7:
-    raise newException(ValueError, "HPACK Huffman padding too long")
-  if bitsAvail > 0:
-    let padMask = (1'u64 shl bitsAvail) - 1'u64
-    if bits != padMask:
-      raise newException(ValueError, "HPACK Huffman padding invalid")
+  # RFC7541 section 5.2: trailing bits must be a prefix of EOS (all one
+  # bits), and padding longer than seven bits is forbidden.
+  if node != 0 and not HuffmanPaddingNodes[node]:
+    raise newException(ValueError, "HPACK Huffman padding invalid")
 
 proc huffmanEncode*(s: string): seq[byte] =
   ## Encode bytes with the RFC 7541 Appendix B Huffman table.

@@ -864,32 +864,53 @@ proc urlFor*(router: Router, name: string,
 # Router dispatch
 # ============================================================
 
-proc isLiteralMatch(segments: seq[PathSegment], path: string, pathEnd: int): bool {.inline.} =
-  ## Zero-allocation match for literal-only routes against raw path string.
-  ## pathEnd is the index where the path ends (before query string).
+proc matchFastRoute(segments: seq[PathSegment], path: string, pathEnd: int,
+                    params: var Table[string, string]): bool {.inline.} =
+  ## Match literal and required-parameter routes against the raw path without
+  ## allocating a split-path sequence. Complex routes fall back to the full
+  ## matcher. `pathEnd` excludes the query string.
   if segments.len == 0:
     # Root route "/" matches path "/" exactly
-    return pathEnd == 1 and path[0] == '/'
-  # General case: match "/seg1/seg2/..." against the raw path
-  var pos = 0
-  if pos < pathEnd and path[pos] == '/':
-    inc pos  # skip leading /
+    return pathEnd == 1 and path.len > 0 and path[0] == '/'
+  if pathEnd <= 1 or path[0] != '/':
+    return false
+
+  var pos = 1
   for i in 0 ..< segments.len:
-    if segments[i].kind != pskLiteral:
+    let segment = segments[i]
+    if segment.kind == pskWildcard or
+        (segment.kind == pskParam and segment.optional):
       return false
-    let seg = segments[i].value
-    if pos + seg.len > pathEnd:
+
+    let partStart = pos
+    while pos < pathEnd and path[pos] != '/':
+      inc pos
+    if pos == partStart:
       return false
-    for j in 0 ..< seg.len:
-      if path[pos + j] != seg[j]:
+
+    case segment.kind
+    of pskLiteral:
+      let literal = segment.value
+      if pos - partStart != literal.len:
         return false
-    pos += seg.len
+      for j in 0 ..< literal.len:
+        if path[partStart + j] != literal[j]:
+          return false
+    of pskParam:
+      let decoded = decodeUrl(path[partStart ..< pos])
+      if not validateParamType(decoded, segment.paramType):
+        return false
+      if params.len == 0:
+        params = initTable[string, string](segments.len)
+      params[segment.paramName] = decoded
+    of pskWildcard:
+      return false
+
     if i < segments.len - 1:
-      # Expect separator between segments
       if pos >= pathEnd or path[pos] != '/':
         return false
       inc pos
-  # Accept with or without trailing slash
+
   pos == pathEnd or (pos == pathEnd - 1 and path[pos] == '/')
 
 proc dispatch*(router: Router, req: HttpRequest): CpsFuture[HttpResponseBuilder] =
@@ -897,9 +918,9 @@ proc dispatch*(router: Router, req: HttpRequest): CpsFuture[HttpResponseBuilder]
   ## Supports error recovery, pass (next-route), HEAD/OPTIONS auto-generation,
   ## and trailing slash normalization.
 
-  # ---- Fast path for literal routes with no middleware ----
-  # Avoids: HttpRequest copy, splitPathParts, Table allocs, matchedRoutes seq,
-  #         invokeRoute closures, chainRoutes futures, invokeWithRecovery wrapper.
+  # ---- Fast path for simple routes with no middleware ----
+  # Avoids: HttpRequest copy, splitPathParts, superfluous Table allocations,
+  #         matchedRoutes seq, and the middleware/recovery wrapper closures.
   if not router.methodOverrideEnabled and
      router.trailingSlash == tsbIgnore and
      router.errorHandler.isNil and
@@ -912,19 +933,20 @@ proc dispatch*(router: Router, req: HttpRequest): CpsFuture[HttpResponseBuilder]
       let route = router.routes[i]
       if route.meth != req.meth and route.meth != "*": continue
       if route.middlewares.len > 0: continue
-      if isLiteralMatch(route.segments, req.path, pathEnd):
-        # Direct handler call — zero extra allocations
-        let emptyPP = initTable[string, string]()
-        let qp = if qIdx >= 0: parseQueryString(req.path) else: emptyPP
+      var pathParams: Table[string, string]
+      if matchFastRoute(route.segments, req.path, pathEnd, pathParams):
+        # Direct handler call; literal routes need no parameter table allocation.
+        var emptyQueryParams: Table[string, string]
+        let qp = if qIdx >= 0: parseQueryString(req.path) else: emptyQueryParams
         var resultFut: CpsFuture[HttpResponseBuilder]
         if router.appState.isNil and router.templateRenderer.isNil:
           # Skip HttpRequest copy when no enrichment needed
-          resultFut = route.handler(req, emptyPP, qp)
+          resultFut = route.handler(req, pathParams, qp)
         else:
           var enrichedReq = req
           enrichedReq.appState = router.appState
           enrichedReq.templateRenderer = router.templateRenderer
-          resultFut = route.handler(enrichedReq, emptyPP, qp)
+          resultFut = route.handler(enrichedReq, pathParams, qp)
         if resultFut.finished():
           if resultFut.hasError():
             # Inline error recovery (same as invokeWithRecovery)

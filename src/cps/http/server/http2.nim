@@ -16,9 +16,17 @@ import ./types
 import ../shared/http2_stream_adapter
 
 type
-  OutboundFrameWrite = object
+  SerializedWritePayload = ref object
+    data: string
+
+  OutboundWrite = object
     frame: Http2Frame
+    serialized: SerializedWritePayload
     completion: CpsVoidFuture
+
+  PeerStreamRange = object
+    first: uint32
+    last: uint32
 
   Http2ServerStream* = ref object
     id*: uint32
@@ -55,7 +63,7 @@ type
     peerMaxFrameSize*: int
     acceptingNewStreams*: bool
     continuationStreamId*: uint32
-    outboundQueue*: Deque[OutboundFrameWrite]
+    outboundQueue*: Deque[OutboundWrite]
     writerRunning*: bool
     writerWake*: CpsVoidFuture
     writerError*: ref CatchableError
@@ -63,7 +71,7 @@ type
     shutdownFlag*: ptr bool
     goAwaySent*: bool
     remoteAddr*: string
-    seenPeerStreams*: Table[uint32, bool]
+    seenPeerStreamRanges: seq[PeerStreamRange]
 
 const
   H2ErrNoError = 0'u32
@@ -79,10 +87,8 @@ const
   H2ErrEnhanceYourCalm = 11'u32
 
 proc frameToString(frame: Http2Frame): string =
-  let data = serializeFrame(frame)
-  result = newString(data.len)
-  for i in 0 ..< data.len:
-    result[i] = char(data[i])
+  result = newStringOfCap(9 + frame.payload.len)
+  result.appendSerializedFrame(frame)
 
 proc wakeWaiters(waiters: var seq[CpsVoidFuture]) =
   for i in 0 ..< waiters.len:
@@ -122,7 +128,7 @@ proc newHttp2ServerConnection*(s: AsyncStream, config: HttpServerConfig,
     peerMaxFrameSize: DefaultMaxFrameSize,
     acceptingNewStreams: true,
     continuationStreamId: 0,
-    outboundQueue: initDeque[OutboundFrameWrite](),
+    outboundQueue: initDeque[OutboundWrite](),
     writerRunning: false,
     writerWake: nil,
     writerError: nil,
@@ -130,7 +136,7 @@ proc newHttp2ServerConnection*(s: AsyncStream, config: HttpServerConfig,
     shutdownFlag: shutdownFlag,
     goAwaySent: false,
     remoteAddr: remoteAddr,
-    seenPeerStreams: initTable[uint32, bool]()
+    seenPeerStreamRanges: @[]
   )
 
 proc failPendingOutbound(conn: Http2ServerConnection, err: ref CatchableError) =
@@ -153,7 +159,13 @@ proc runWriter(conn: Http2ServerConnection): CpsVoidFuture {.cps.} =
         continue
 
       let pending = conn.outboundQueue.popFirst()
-      let serialized = frameToString(pending.frame)
+      # Keep the selected payload in a CPS-hoisted local across the async
+      # transport write. Ordinary frame sends retain the established
+      # frame-owned path; coalesced writes opt into pre-serialized data.
+      let ownedSerialized = pending.serialized
+      let serialized =
+        if not ownedSerialized.isNil: ownedSerialized.data
+        else: frameToString(pending.frame)
       inFlightCompletion = pending.completion
       await conn.stream.write(serialized)
       if not pending.completion.finished:
@@ -168,6 +180,28 @@ proc runWriter(conn: Http2ServerConnection): CpsVoidFuture {.cps.} =
   finally:
     conn.writerRunning = false
 
+proc enqueueWrite(conn: Http2ServerConnection, data: sink string): CpsVoidFuture =
+  let fut = newCpsVoidFuture()
+  if not conn.running:
+    fut.fail(newException(system.IOError, "HTTP/2 connection is closed"))
+    return fut
+  if not conn.writerError.isNil:
+    fut.fail(conn.writerError)
+    return fut
+
+  conn.outboundQueue.addLast(OutboundWrite(
+    serialized: SerializedWritePayload(data: data),
+    completion: fut
+  ))
+
+  if not conn.writerRunning:
+    conn.writerRunning = true
+    conn.streamGroup.spawn(runWriter(conn))
+  elif not conn.writerWake.isNil and not conn.writerWake.finished:
+    conn.writerWake.complete()
+
+  return fut
+
 proc enqueueFrame(conn: Http2ServerConnection, frame: Http2Frame): CpsVoidFuture =
   let fut = newCpsVoidFuture()
   if not conn.running:
@@ -177,7 +211,10 @@ proc enqueueFrame(conn: Http2ServerConnection, frame: Http2Frame): CpsVoidFuture
     fut.fail(conn.writerError)
     return fut
 
-  conn.outboundQueue.addLast(OutboundFrameWrite(frame: frame, completion: fut))
+  conn.outboundQueue.addLast(OutboundWrite(
+    frame: frame,
+    completion: fut
+  ))
 
   if not conn.writerRunning:
     conn.writerRunning = true
@@ -185,7 +222,7 @@ proc enqueueFrame(conn: Http2ServerConnection, frame: Http2Frame): CpsVoidFuture
   elif not conn.writerWake.isNil and not conn.writerWake.finished:
     conn.writerWake.complete()
 
-  return fut
+  fut
 
 proc sendFrame*(conn: Http2ServerConnection, frame: Http2Frame): CpsVoidFuture {.cps.} =
   await enqueueFrame(conn, frame)
@@ -278,7 +315,29 @@ proc closeStream(conn: Http2ServerConnection, streamId: uint32,
 
 proc peerStreamWasOpened(conn: Http2ServerConnection,
                          streamId: uint32): bool {.inline.} =
-  streamId in conn.seenPeerStreams
+  var low = 0
+  var high = conn.seenPeerStreamRanges.len
+  while low < high:
+    let mid = low + (high - low) div 2
+    let r = conn.seenPeerStreamRanges[mid]
+    if streamId < r.first:
+      high = mid
+    elif streamId > r.last:
+      low = mid + 1
+    else:
+      return true
+  false
+
+proc markPeerStreamSeen(conn: Http2ServerConnection, streamId: uint32) {.inline.} =
+  ## Client stream IDs arrive in increasing order. Compress the overwhelmingly
+  ## common contiguous sequence into one range instead of retaining a hash
+  ## table entry for every completed request. Gaps remain exact protocol state.
+  if conn.seenPeerStreamRanges.len > 0:
+    let lastIdx = conn.seenPeerStreamRanges.high
+    if conn.seenPeerStreamRanges[lastIdx].last + 2'u32 == streamId:
+      conn.seenPeerStreamRanges[lastIdx].last = streamId
+      return
+  conn.seenPeerStreamRanges.add PeerStreamRange(first: streamId, last: streamId)
 
 proc currentPeerMaxFrameSize(conn: Http2ServerConnection): int {.inline.} =
   if conn.peerMaxFrameSize < DefaultMaxFrameSize:
@@ -328,11 +387,7 @@ proc recvServerFrame*(conn: Http2ServerConnection): CpsFuture[Http2Frame] {.cps.
   if headerStr.len < 9:
     raise newException(system.IOError, "Short frame header")
 
-  var headerBytes = newSeq[byte](9)
-  for i in 0 ..< 9:
-    headerBytes[i] = byte(headerStr[i])
-
-  var frame = parseFrame(headerBytes)
+  var frame = parseFrameHeader(headerStr)
   if frame.length.uint64 > 16_777_215'u64:
     raise newException(ValueError, "Invalid HTTP/2 frame length")
   if int(frame.length) > conn.localWindowSize and frame.frameType == FrameData:
@@ -342,9 +397,7 @@ proc recvServerFrame*(conn: Http2ServerConnection): CpsFuture[Http2Frame] {.cps.
 
   if frame.length > 0:
     let payloadStr = await conn.reader.readExact(int(frame.length))
-    frame.payload = newSeq[byte](payloadStr.len)
-    for i in 0 ..< payloadStr.len:
-      frame.payload[i] = byte(payloadStr[i])
+    frame.payload = bytesFromString(payloadStr)
   else:
     frame.payload = @[]
 
@@ -713,9 +766,9 @@ proc extractDataPayload(frame: Http2Frame, payload: var seq[byte]): bool =
     payload = frame.payload[startIdx ..< endIdx]
   true
 
-proc sendResponseHeaders*(conn: Http2ServerConnection, streamId: uint32,
-                          statusCode: int, headers: seq[(string, string)],
-                          endStream: bool): CpsVoidFuture {.cps.} =
+proc serializeResponseHeaders(conn: Http2ServerConnection, streamId: uint32,
+                              statusCode: int, headers: seq[(string, string)],
+                              endStream: bool): string =
   if statusCode < 200 or statusCode > 999:
     raise newException(ValueError, "Invalid HTTP/2 response status code")
   if not validateH2ResponseHeaders(headers):
@@ -747,7 +800,7 @@ proc sendResponseHeaders*(conn: Http2ServerConnection, streamId: uint32,
       flags = flags or FlagEndHeaders
 
     let ftype = if first: FrameHeaders else: FrameContinuation
-    await sendFrame(conn, Http2Frame(
+    result.appendSerializedFrame(Http2Frame(
       frameType: ftype,
       flags: flags,
       streamId: streamId,
@@ -758,6 +811,17 @@ proc sendResponseHeaders*(conn: Http2ServerConnection, streamId: uint32,
     offset += chunkLen
     if encoded.len == 0:
       break
+
+proc sendResponseHeaders*(conn: Http2ServerConnection, streamId: uint32,
+                          statusCode: int, headers: seq[(string, string)],
+                          endStream: bool): CpsVoidFuture {.cps.} =
+  ## A header block may span HEADERS plus CONTINUATION frames, but it remains
+  ## one ordered write.  Coalescing those frames avoids a TLS record/syscall
+  ## per continuation without changing their HTTP/2 framing.
+  let serialized = conn.serializeResponseHeaders(
+    streamId, statusCode, headers, endStream
+  )
+  await enqueueWrite(conn, serialized)
 
 proc waitForSendWindow(conn: Http2ServerConnection,
                        streamId: uint32): CpsVoidFuture {.cps.} =
@@ -820,6 +884,43 @@ proc sendResponseData*(conn: Http2ServerConnection, streamId: uint32,
       payload: chunk
     ))
     offset += chunkLen
+
+proc trySendBufferedResponse(conn: Http2ServerConnection,
+                             streamId: uint32,
+                             statusCode: int,
+                             headers: seq[(string, string)],
+                             data: seq[byte]): CpsFuture[bool] {.cps.} =
+  ## A buffered response whose body already fits the advertised send windows
+  ## can be framed atomically.  HEADERS and DATA keep their normal HTTP/2
+  ## boundaries, while sharing one ordered TLS write and one completion.
+  if streamId notin conn.streams or not conn.running:
+    return true
+  let s = conn.streams[streamId]
+  if data.len > conn.remoteWindowSize or data.len > s.remoteWindowSize:
+    return false
+
+  var serialized = conn.serializeResponseHeaders(
+    streamId, statusCode, headers, false
+  )
+  let maxFrame = conn.currentPeerMaxFrameSize()
+  var offset = 0
+  while offset < data.len:
+    let chunkLen = min(maxFrame, data.len - offset)
+    let isLast = offset + chunkLen >= data.len
+    serialized.appendSerializedFrameSlice(
+      FrameData,
+      (if isLast: FlagEndStream else: 0'u8),
+      streamId,
+      data,
+      offset,
+      chunkLen
+    )
+    offset += chunkLen
+
+  conn.remoteWindowSize -= data.len
+  s.remoteWindowSize -= data.len
+  await enqueueWrite(conn, serialized)
+  return true
 
 proc statusProhibitsBody(statusCode: int): bool {.inline.} =
   (statusCode >= 100 and statusCode < 200) or statusCode == 204 or
@@ -939,11 +1040,15 @@ proc dispatchHttp2Handler*(conn: Http2ServerConnection, streamId: uint32,
   if suppressBody or resp.body.len == 0:
     await sendResponseHeaders(conn, streamId, resp.statusCode, respHeaders, true)
   else:
-    await sendResponseHeaders(conn, streamId, resp.statusCode, respHeaders, false)
     var bodyBytes = newSeq[byte](resp.body.len)
     for i in 0 ..< resp.body.len:
       bodyBytes[i] = byte(resp.body[i])
-    await sendResponseData(conn, streamId, bodyBytes, true)
+    let sentBuffered = await trySendBufferedResponse(
+      conn, streamId, resp.statusCode, respHeaders, bodyBytes
+    )
+    if not sentBuffered:
+      await sendResponseHeaders(conn, streamId, resp.statusCode, respHeaders, false)
+      await sendResponseData(conn, streamId, bodyBytes, true)
 
   conn.closeStream(streamId)
 
@@ -1038,7 +1143,7 @@ proc processHeadersFrame(conn: Http2ServerConnection,
       await failConnection(conn, H2ErrProtocolError)
       return
     if not conn.acceptingNewStreams and streamId > conn.lastStreamId:
-      conn.seenPeerStreams[streamId] = true
+      conn.markPeerStreamSeen(streamId)
       await sendRstStream(conn, streamId, H2ErrRefusedStream)
       return
     conn.lastStreamId = streamId
@@ -1056,7 +1161,7 @@ proc processHeadersFrame(conn: Http2ServerConnection,
       return
   else:
     if conn.maxConcurrentStreams > 0 and conn.streams.len >= conn.maxConcurrentStreams:
-      conn.seenPeerStreams[streamId] = true
+      conn.markPeerStreamSeen(streamId)
       await sendRstStream(conn, streamId, H2ErrRefusedStream)
       return
     s = Http2ServerStream(
@@ -1073,7 +1178,7 @@ proc processHeadersFrame(conn: Http2ServerConnection,
       expectedContentLength: -1
     )
     conn.streams[streamId] = s
-    conn.seenPeerStreams[streamId] = true
+    conn.markPeerStreamSeen(streamId)
 
   if (frame.flags and FlagPriority) != 0:
     var dependency = 0'u32

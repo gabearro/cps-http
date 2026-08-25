@@ -9,7 +9,6 @@ when defined(posix):
   import cps/concurrency/signals
 import cps/concurrency/taskgroup
 import std/[nativesockets, tables, strutils, os, net]
-import cps/private/platform
 import cps/io/streams
 import cps/io/tcp
 import cps/tls/server as tls_server
@@ -139,6 +138,44 @@ proc closeHttp3ProtocolFailure(ep: quic_endpoint.QuicEndpoint,
   if conn.state != quic_connection.qcsClosed:
     conn.state = quic_connection.qcsDraining
 
+proc closeHttp3GracefullyIfReady(ep: quic_endpoint.QuicEndpoint,
+                                 conn: quic_connection.QuicConnection,
+                                 session: http3_server.Http3ServerSession): CpsVoidFuture {.cps.} =
+  ## A peer GOAWAY starts graceful HTTP/3 shutdown. Drain every response that
+  ## was already accepted, send our GOAWAY on the control stream, then finish
+  ## the QUIC connection with H3_NO_ERROR so peers do not wait for idle expiry.
+  if ep.isNil or conn.isNil or session.isNil or
+      conn.state in {quic_connection.qcsClosed, quic_connection.qcsDraining} or
+      not session.conn.hasPeerGoaway or session.hasPendingRequests() or
+      session.conn.controlState == h3csGoawaySent:
+    return
+
+  let goaway = session.conn.sendGracefulServerGoaway()
+  await ep.sendStreamData(
+    conn,
+    session.conn.controlStreamId,
+    goaway,
+    fin = false
+  )
+
+  # sendStreamData deliberately defers packet construction inside a receive
+  # callback. Shutdown is the batch boundary: flush response and GOAWAY STREAM
+  # frames before emitting CONNECTION_CLOSE.
+  while conn.streamSendBatchActive():
+    conn.endStreamSendBatch()
+  await ep.flushPendingControl(conn)
+
+  conn.pendingControlFrames.add quic_types.QuicFrame(
+    kind: quic_types.qfkConnectionClose,
+    isApplicationClose: true,
+    errorCode: H3ErrNoError,
+    frameType: 0'u64,
+    reason: ""
+  )
+  await ep.flushPendingControl(conn)
+  conn.setCloseReason(H3ErrNoError, "graceful HTTP/3 shutdown")
+  conn.enterDraining()
+
 proc currentExceptionOr(defaultMsg: string): string =
   let msg = getCurrentExceptionMsg()
   if msg.len > 0:
@@ -181,6 +218,9 @@ proc flushHttp3ApplicationQueues(ep: quic_endpoint.QuicEndpoint,
                                  session: http3_server.Http3ServerSession): CpsVoidFuture {.cps.} =
   if conn.isNil or session.isNil or conn.state != quic_connection.qcsActive or
       not conn.canEncodePacketType(quic_types.qptShort):
+    return
+  if session.conn.webTransportSessions.len == 0 and
+      session.conn.masqueSessions.len == 0:
     return
   if session.conn.canSendH3Datagrams():
     let webtransportDatagrams = session.conn.popWebTransportOutgoingDatagrams()
@@ -299,6 +339,7 @@ proc handleQuicHttp3Stream(ep: quic_endpoint.QuicEndpoint,
           let retryFin = not session.hasPendingRequestStream(pendingStreamId)
           await ep.sendStreamData(conn, pendingStreamId, retryFrames, fin = retryFin)
     await flushHttp3ApplicationQueues(ep, conn, session)
+    await closeHttp3GracefullyIfReady(ep, conn, session)
     return
 
   if reqBytes.len == 0 and not streamEnded:
@@ -334,6 +375,7 @@ proc handleQuicHttp3Stream(ep: quic_endpoint.QuicEndpoint,
     let responseFin = not session.hasPendingRequestStream(streamId)
     await ep.sendStreamData(conn, streamId, respFrames, fin = responseFin)
   await flushHttp3ApplicationQueues(ep, conn, session)
+  await closeHttp3GracefullyIfReady(ep, conn, session)
 
 proc initializeQuicHttp3Connection(ep: quic_endpoint.QuicEndpoint,
                                    sessions: H3SessionStore,
@@ -495,9 +537,6 @@ proc start*(server: HttpServer): CpsVoidFuture {.cps.} =
         else:
           break
 
-      # Disable Nagle for low-latency small responses (keep-alive)
-      client.fd.setSockOptInt(cint(IPPROTO_TCP), TCP_NODELAY, 1)
-
       # Apply a hard cap on concurrent active connections.
       if server.config.maxConnections > 0 and server.connGroup.activeCount >= server.config.maxConnections:
         client.close()
@@ -560,7 +599,11 @@ proc serve*(handler: HttpHandler, port: int = 8080,
             quicInitialMaxStreamDataBidiRemote: uint64 = 262_144'u64,
             quicInitialMaxStreamDataUni: uint64 = 262_144'u64,
             quicInitialMaxStreamsBidi: uint64 = 100'u64,
-            quicInitialMaxStreamsUni: uint64 = 100'u64) =
+            quicInitialMaxStreamsUni: uint64 = 100'u64,
+            reusePort: bool = false,
+            deferAcceptSeconds: int = 1,
+            tcpNoDelay: bool = true,
+            initialReadBufferBytes: int = 2048) =
   ## Convenience: create server, bind, start accept loop, run event loop.
   let server = newHttpServer(
     handler,
@@ -581,7 +624,11 @@ proc serve*(handler: HttpHandler, port: int = 8080,
     quicInitialMaxStreamDataBidiRemote = quicInitialMaxStreamDataBidiRemote,
     quicInitialMaxStreamDataUni = quicInitialMaxStreamDataUni,
     quicInitialMaxStreamsBidi = quicInitialMaxStreamsBidi,
-    quicInitialMaxStreamsUni = quicInitialMaxStreamsUni
+    quicInitialMaxStreamsUni = quicInitialMaxStreamsUni,
+    reusePort = reusePort,
+    deferAcceptSeconds = deferAcceptSeconds,
+    tcpNoDelay = tcpNoDelay,
+    initialReadBufferBytes = initialReadBufferBytes
   )
   server.bindAndListen()
   let scheme = if useTls: "https" else: "http"

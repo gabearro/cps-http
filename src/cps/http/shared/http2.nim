@@ -133,8 +133,58 @@ proc serializeFrame*(frame: Http2Frame): seq[byte] =
   result[7] = byte((frame.streamId shr 8) and 0xFF)
   result[8] = byte(frame.streamId and 0xFF)
   # Payload
-  for i, b in frame.payload:
-    result[9 + i] = b
+  if frame.payload.len > 0:
+    copyMem(addr result[9], unsafeAddr frame.payload[0], frame.payload.len)
+
+proc appendSerializedFrameSlice*(dest: var string,
+                                 frameType, flags: uint8,
+                                 streamId: uint32,
+                                 payload: openArray[byte],
+                                 payloadOffset, payloadLen: int) =
+  ## Append one frame from a payload slice without allocating the slice.  This
+  ## is useful for DATA fragmentation and for coalescing several frames into a
+  ## single transport write.
+  assert payloadOffset >= 0 and payloadLen >= 0 and
+    payloadOffset + payloadLen <= payload.len
+  let start = dest.len
+  let length = payloadLen.uint32
+  dest.setLen(start + 9 + payloadLen)
+  dest[start] = char((length shr 16) and 0xFF)
+  dest[start + 1] = char((length shr 8) and 0xFF)
+  dest[start + 2] = char(length and 0xFF)
+  dest[start + 3] = char(frameType)
+  dest[start + 4] = char(flags)
+  dest[start + 5] = char((streamId shr 24) and 0x7F)
+  dest[start + 6] = char((streamId shr 16) and 0xFF)
+  dest[start + 7] = char((streamId shr 8) and 0xFF)
+  dest[start + 8] = char(streamId and 0xFF)
+  if payloadLen > 0:
+    copyMem(addr dest[start + 9], unsafeAddr payload[payloadOffset], payloadLen)
+
+proc appendSerializedFrame*(dest: var string, frame: Http2Frame) =
+  ## Append a frame directly to a byte string.  This is the representation used
+  ## by AsyncStream writes and avoids allocating an intermediate seq[byte].
+  dest.appendSerializedFrameSlice(
+    frame.frameType, frame.flags, frame.streamId,
+    frame.payload, 0, frame.payload.len
+  )
+
+proc parseFrameHeader*(data: string): Http2Frame =
+  ## Parse the fixed header directly from BufferedReader's native string,
+  ## avoiding a temporary nine-byte sequence for every frame.
+  assert data.len >= 9
+  result.length = (uint32(byte(data[0])) shl 16) or
+                  (uint32(byte(data[1])) shl 8) or uint32(byte(data[2]))
+  result.frameType = byte(data[3])
+  result.flags = byte(data[4])
+  result.streamId = (uint32(byte(data[5]) and 0x7F) shl 24) or
+                    (uint32(byte(data[6])) shl 16) or
+                    (uint32(byte(data[7])) shl 8) or uint32(byte(data[8]))
+
+proc bytesFromString*(data: string): seq[byte] =
+  result = newSeq[byte](data.len)
+  if data.len > 0:
+    copyMem(addr result[0], unsafeAddr data[0], data.len)
 
 proc toFrameBytes(s: string): seq[byte] =
   result = newSeq[byte](s.len)
@@ -183,10 +233,8 @@ proc newHttp2Connection*(stream: AsyncStream): Http2Connection =
   )
 
 proc frameToString(frame: Http2Frame): string =
-  let data = serializeFrame(frame)
-  result = newString(data.len)
-  for i, b in data:
-    result[i] = char(b)
+  result = newStringOfCap(9 + frame.payload.len)
+  result.appendSerializedFrame(frame)
 
 proc failPendingOutbound(conn: Http2Connection, err: ref CatchableError) =
   while conn.outboundQueue.len > 0:
@@ -1044,19 +1092,13 @@ proc recvFrame*(conn: Http2Connection): CpsFuture[Http2Frame] {.cps.} =
   if headerStr.len < 9:
     raise newException(system.IOError, "Short frame header")
 
-  var headerBytes = newSeq[byte](9)
-  for i in 0 ..< 9:
-    headerBytes[i] = byte(headerStr[i])
-
-  var frame = parseFrame(headerBytes)
+  var frame = parseFrameHeader(headerStr)
   if int(frame.length) > conn.localMaxFrameSize:
     raise newException(system.IOError, "Inbound frame exceeds local max frame size")
 
   if frame.length > 0:
     let payloadStr = await conn.reader.readExact(int(frame.length))
-    frame.payload = newSeq[byte](payloadStr.len)
-    for i in 0 ..< payloadStr.len:
-      frame.payload[i] = byte(payloadStr[i])
+    frame.payload = bytesFromString(payloadStr)
   else:
     frame.payload = @[]
 

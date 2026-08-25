@@ -448,6 +448,14 @@ proc sendGoaway*(conn: Http3Connection, id: uint64): seq[byte] =
   conn.hasLocalGoaway = true
   conn.controlState = h3csGoawaySent
 
+proc sendGracefulServerGoaway*(conn: Http3Connection): seq[byte] =
+  ## Start graceful server shutdown without rejecting any request stream that
+  ## the peer could already have opened. A terminating transport close follows
+  ## after the server has drained its active request set.
+  if conn.isClient:
+    raise newException(ValueError, "server GOAWAY cannot be sent by a client")
+  conn.sendGoaway(MaxClientBidirectionalStreamId)
+
 proc fieldSectionSize(headers: openArray[QpackHeaderField]): uint64
 proc validatePushPromiseRequestHeaders(streamId: uint64,
                                        headers: openArray[QpackHeaderField]): Http3Event

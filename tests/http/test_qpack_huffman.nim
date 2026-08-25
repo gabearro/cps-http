@@ -42,6 +42,30 @@ block testHuffmanCodecRoundTrip:
     doAssert decoded == sample
   echo "PASS: RFC7541 Huffman codec round-trip"
 
+block testHuffmanCodecAllByteValuesAndOffset:
+  for i in 0 .. 255:
+    let sample = $char(i)
+    let oneEncoded = huffmanEncode(sample)
+    try:
+      let oneDecoded = huffmanDecode(oneEncoded, 0, oneEncoded.len)
+      if oneDecoded != sample:
+        echo "single-byte Huffman mismatch at symbol ", i,
+          " decodedLen=", oneDecoded.len,
+          (if oneDecoded.len > 0: " decoded=" & $ord(oneDecoded[0]) else: "")
+        doAssert false
+    except ValueError:
+      echo "single-byte Huffman failure at symbol ", i
+      raise
+  var allBytes = newString(256)
+  for i in 0 .. 255:
+    allBytes[i] = char(i)
+  let encoded = huffmanEncode(allBytes)
+  var wrapped = @[0xA5'u8, 0x5A'u8]
+  wrapped.add encoded
+  wrapped.add 0xC3'u8
+  doAssert huffmanDecode(wrapped, 2, encoded.len) == allBytes
+  echo "PASS: RFC7541 Huffman codec covers every byte and sliced input"
+
 block testQpackRfcWireUsesAndDecodesHuffman:
   let enc = newQpackEncoder(maxTableCapacity = 4096, blockedStreamsLimit = 8)
   let dec = newQpackDecoder(maxTableCapacity = 4096, blockedStreamsLimit = 8)
