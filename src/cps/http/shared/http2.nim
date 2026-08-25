@@ -182,6 +182,7 @@ proc parseFrameHeader*(data: string): Http2Frame =
                     (uint32(byte(data[7])) shl 8) or uint32(byte(data[8]))
 
 proc bytesFromString*(data: string): seq[byte] =
+  ## Copy a string into the byte representation used by HTTP/2.
   result = newSeq[byte](data.len)
   if data.len > 0:
     copyMem(addr result[0], unsafeAddr data[0], data.len)
@@ -209,6 +210,7 @@ proc parseFrame*(data: seq[byte]): Http2Frame =
 # ============================================================
 
 proc newHttp2Connection*(stream: AsyncStream): Http2Connection =
+  ## Create a new http2 connection.
   let reader = newBufferedReader(stream)
   Http2Connection(
     stream: stream,
@@ -287,9 +289,11 @@ proc enqueueFrame(conn: Http2Connection, frame: Http2Frame): CpsVoidFuture =
   return fut
 
 proc sendFrame*(conn: Http2Connection, frame: Http2Frame): CpsVoidFuture =
+  ## Send frame through the active transport.
   enqueueFrame(conn, frame)
 
 proc sendSettings*(conn: Http2Connection, settings: seq[(uint16, uint32)] = @[]): CpsVoidFuture =
+  ## Send settings through the active transport.
   var payload: seq[byte]
   for (id, value) in settings:
     payload.add byte((id shr 8) and 0xFF)
@@ -307,6 +311,7 @@ proc sendSettings*(conn: Http2Connection, settings: seq[(uint16, uint32)] = @[])
   sendFrame(conn, frame)
 
 proc sendSettingsAck*(conn: Http2Connection): CpsVoidFuture =
+  ## Send settings ack through the active transport.
   let frame = Http2Frame(
     frameType: FrameSettings,
     flags: FlagAck,
@@ -316,6 +321,7 @@ proc sendSettingsAck*(conn: Http2Connection): CpsVoidFuture =
   sendFrame(conn, frame)
 
 proc sendWindowUpdate*(conn: Http2Connection, streamId: uint32, increment: uint32): CpsVoidFuture =
+  ## Send window update through the active transport.
   var payload: seq[byte] = @[
     byte((increment shr 24) and 0x7F),
     byte((increment shr 16) and 0xFF),

@@ -33,6 +33,7 @@ const defaultMaxHeaderBytes = 64 * 1024
 const defaultMaxHeaderCount = 100
 
 proc getHeader*(resp: HttpResponse, name: string): string =
+  ## Return an HTTP/1 response header by case-insensitive name.
   for (k, v) in resp.headers:
     if k.toLowerAscii == name.toLowerAscii:
       return v

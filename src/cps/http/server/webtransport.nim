@@ -14,6 +14,7 @@ proc acceptWebTransportSession*(sessionId: uint64,
                                 origin: string = "",
                                 policyHook: WebTransportPolicyHook = nil,
                                 handler: WebTransportSessionHandler = nil): CpsFuture[wt_shared.WebTransportSession] {.cps.} =
+  ## Accept a WebTransport CONNECT request as a new session.
   if not policyHook.isNil:
     if not policyHook(origin, authority, path):
       raise newException(ValueError, "WebTransport session rejected by server policy")
@@ -23,7 +24,9 @@ proc acceptWebTransportSession*(sessionId: uint64,
   return session
 
 proc parseConnectRequest*(headers: openArray[(string, string)]): wt_shared.WebTransportConnectRequest =
+  ## Parse connect request from its encoded representation.
   wt_shared.parseWebTransportConnectHeaders(headers)
 
 proc isWebTransportConnectRequest*(headers: openArray[(string, string)]): bool =
+  ## Return whether the headers describe a WebTransport CONNECT request.
   wt_shared.isWebTransportConnectRequest(headers)

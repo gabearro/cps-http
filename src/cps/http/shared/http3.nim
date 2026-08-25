@@ -56,15 +56,18 @@ proc appendBytes(dst: var seq[byte], src: openArray[byte]) {.inline.} =
     dst.add src
 
 proc encodeHttp3Frame*(frameType: uint64, payload: openArray[byte]): seq[byte] =
+  ## Encode http3 frame into its wire representation.
   result = @[]
   result.appendQuicVarInt(frameType)
   result.appendQuicVarInt(uint64(payload.len))
   result.appendBytes(payload)
 
 proc encodeHttp3Frame*(frame: Http3Frame): seq[byte] =
+  ## Encode http3 frame into its wire representation.
   encodeHttp3Frame(frame.frameType, frame.payload)
 
 proc decodeHttp3Frame*(data: openArray[byte], offset: var int): Http3Frame =
+  ## Decode http3 frame from its wire representation.
   let frameType = decodeQuicVarInt(data, offset)
   let payloadLen = decodeQuicVarInt(data, offset)
   if payloadLen > uint64(data.len - offset):
@@ -77,17 +80,20 @@ proc decodeHttp3Frame*(data: openArray[byte], offset: var int): Http3Frame =
   offset += n
 
 proc decodeAllHttp3Frames*(data: openArray[byte]): seq[Http3Frame] =
+  ## Decode all http3 frames from its wire representation.
   var off = 0
   while off < data.len:
     result.add decodeHttp3Frame(data, off)
 
 proc encodeSettingsPayload*(settings: openArray[(uint64, uint64)]): seq[byte] =
+  ## Encode settings payload into its wire representation.
   result = @[]
   for (k, v) in settings:
     result.appendQuicVarInt(k)
     result.appendQuicVarInt(v)
 
 proc decodeSettingsPayload*(payload: openArray[byte]): seq[(uint64, uint64)] =
+  ## Decode settings payload from its wire representation.
   var off = 0
   while off < payload.len:
     let k = decodeQuicVarInt(payload, off)
@@ -122,6 +128,7 @@ proc decodeSettingsPayloadStrict*(payload: openArray[byte]): seq[(uint64, uint64
     result.add (k, v)
 
 proc describeHttp3FrameType*(frameType: uint64): string =
+  ## Return a readable name for an HTTP/3 frame type.
   case frameType
   of H3FrameData: "DATA"
   of H3FrameHeaders: "HEADERS"

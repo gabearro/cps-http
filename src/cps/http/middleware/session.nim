@@ -32,6 +32,7 @@ proc newSessionConfig*(secret: string, cookieName: string = "session",
                        maxAge: int = 3600, httpOnly: bool = true,
                        secure: bool = false, sameSite: string = "Lax",
                        path: string = "/", maxCookieBytes: int = 4096): SessionConfig =
+  ## Create a new session config.
   if secret.len == 0:
     raise newException(ValueError, "Session secret must not be empty")
   var filteredFallbacks: seq[string]

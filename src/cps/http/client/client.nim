@@ -94,6 +94,7 @@ type
 
 proc newConnectionPool*(maxPerHost: int = 6,
                         maxIdleSeconds: float = 30.0): ConnectionPool =
+  ## Create a new connection pool.
   ConnectionPool(
     connections: initTable[PoolKey, seq[PooledConnection]](),
     maxPerHost: maxPerHost,
@@ -203,6 +204,7 @@ proc newHttpsClient*(preferHttp2: bool = true,
                      maxIdleSeconds: float = 30.0,
                      fingerprint: BrowserProfile = nil,
                      proxy: seq[ProxyConfig] = @[]): HttpsClient =
+  ## Create a new HTTPS client.
   var ua = userAgent
   if fingerprint != nil and fingerprint.tls != nil and fingerprint.tls.userAgent.len > 0:
     ua = fingerprint.tls.userAgent
@@ -314,6 +316,7 @@ proc updateAltSvcCache(client: HttpsClient,
       break
 
 proc getHeader*(resp: HttpsResponse, name: string): string =
+  ## Return a response header by case-insensitive name.
   for (k, v) in resp.headers:
     if k.toLowerAscii == name.toLowerAscii:
       return v
@@ -913,20 +916,25 @@ proc close*(client: HttpsClient) =
 
 proc get*(client: HttpsClient, url: string,
           headers: seq[(string, string)] = @[]): CpsFuture[HttpsResponse] =
+  ## Perform an HTTP GET request.
   fetch(client, "GET", url, headers)
 
 proc post*(client: HttpsClient, url: string, body: string,
            headers: seq[(string, string)] = @[]): CpsFuture[HttpsResponse] =
+  ## Perform an HTTP POST request.
   fetch(client, "POST", url, headers, body)
 
 proc put*(client: HttpsClient, url: string, body: string,
           headers: seq[(string, string)] = @[]): CpsFuture[HttpsResponse] =
+  ## Perform an HTTP PUT request.
   fetch(client, "PUT", url, headers, body)
 
 proc delete*(client: HttpsClient, url: string,
              headers: seq[(string, string)] = @[]): CpsFuture[HttpsResponse] =
+  ## Perform an HTTP DELETE request.
   fetch(client, "DELETE", url, headers)
 
 proc head*(client: HttpsClient, url: string,
            headers: seq[(string, string)] = @[]): CpsFuture[HttpsResponse] =
+  ## Perform an HTTP HEAD request.
   fetch(client, "HEAD", url, headers)

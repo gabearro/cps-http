@@ -135,6 +135,7 @@ proc newHttp3Connection*(isClient: bool,
                          maxRequestStreamBufferBytes: int = DefaultHttp3RequestStreamBufferBytes,
                          maxTotalUniStreamBufferBytes: int = DefaultHttp3TotalUniStreamBufferBytes,
                          maxTotalRequestStreamBufferBytes: int = DefaultHttp3TotalRequestStreamBufferBytes): Http3Connection =
+  ## Create a new http3 connection.
   if qpackTableCapacity < 0:
     raise newException(ValueError, "HTTP/3 QPACK table capacity must be non-negative")
   if qpackBlockedStreams < 0:
@@ -233,16 +234,19 @@ proc encodeControlStreamPreface*(conn: Http3Connection): seq[byte] =
   conn.controlState = h3csSettingsSent
 
 proc encodeQpackEncoderStreamPreface*(conn: Http3Connection): seq[byte] =
+  ## Encode qpack encoder stream preface into its wire representation.
   result = @[]
   result.appendQuicVarInt(H3UniQpackEncoderStream)
 
 proc encodeQpackDecoderStreamPreface*(conn: Http3Connection): seq[byte] =
+  ## Encode qpack decoder stream preface into its wire representation.
   result = @[]
   result.appendQuicVarInt(H3UniQpackDecoderStream)
 
 proc peerSettingValue*(conn: Http3Connection,
                        settingId: uint64,
                        defaultValue: uint64 = 0'u64): uint64 =
+  ## Return the peer's effective HTTP/3 setting value.
   if conn.isNil:
     return defaultValue
   if settingId in conn.peerSettings:
@@ -252,6 +256,7 @@ proc peerSettingValue*(conn: Http3Connection,
 proc localSettingValue*(conn: Http3Connection,
                         settingId: uint64,
                         defaultValue: uint64 = 0'u64): uint64 =
+  ## Return the local HTTP/3 setting value.
   if conn.isNil:
     return defaultValue
   for (k, v) in conn.localSettings:
@@ -313,6 +318,7 @@ proc validateLocalSettingsForEmission(settings: openArray[(uint64, uint64)]) =
 proc setLocalSettingValue*(conn: Http3Connection,
                            settingId: uint64,
                            value: uint64) =
+  ## Set local setting value on the current http3 connection.
   if conn.isNil:
     return
   validateQuicVarIntRange(settingId, "SETTINGS identifier")
@@ -329,6 +335,7 @@ proc setLocalSettingValue*(conn: Http3Connection,
     conn.applyLocalQpackLimits()
 
 proc canSendH3Datagrams*(conn: Http3Connection): bool =
+  ## Return whether the peer permits HTTP/3 datagrams.
   if conn.isNil:
     return false
   if not conn.peerSettingsReceived:
@@ -359,14 +366,17 @@ proc applyPeerQpackLimits(conn: Http3Connection) =
     conn.qpackEncoder.dynamicTable.setLen(conn.qpackEncoder.dynamicTable.len - 1)
 
 proc drainQpackEncoderStreamData*(conn: Http3Connection): seq[byte] =
+  ## Drain QPACK encoder-stream bytes ready for transmission.
   result = conn.pendingQpackEncoderStreamData
   conn.pendingQpackEncoderStreamData = @[]
 
 proc drainQpackDecoderStreamData*(conn: Http3Connection): seq[byte] =
+  ## Drain QPACK decoder-stream bytes ready for transmission.
   result = conn.pendingQpackDecoderStreamData
   conn.pendingQpackDecoderStreamData = @[]
 
 proc encodeHeadersFrame*(conn: Http3Connection, headers: openArray[QpackHeaderField]): seq[byte] =
+  ## Encode headers frame into its wire representation.
   let headerBlock =
     if conn.useRfcQpackWire:
       var emitted: seq[QpackEncoderInstruction] = @[]
@@ -378,30 +388,36 @@ proc encodeHeadersFrame*(conn: Http3Connection, headers: openArray[QpackHeaderFi
   encodeHttp3Frame(H3FrameHeaders, headerBlock)
 
 proc decodeHeadersFrame*(conn: Http3Connection, payload: openArray[byte]): seq[QpackHeaderField] =
+  ## Decode headers frame from its wire representation.
   if conn.useRfcQpackWire:
     conn.qpackDecoder.decodeHeadersRfcWire(payload)
   else:
     conn.qpackDecoder.decodeHeaders(payload)
 
 proc encodeDataFrame*(payload: openArray[byte]): seq[byte] =
+  ## Encode data frame into its wire representation.
   encodeHttp3Frame(H3FrameData, payload)
 
 proc encodeGoawayFrame*(id: uint64): seq[byte] =
+  ## Encode goaway frame into its wire representation.
   var payload: seq[byte] = @[]
   payload.appendQuicVarInt(id)
   encodeHttp3Frame(H3FrameGoaway, payload)
 
 proc encodeCancelPushFrame*(pushId: uint64): seq[byte] =
+  ## Encode cancel push frame into its wire representation.
   var payload: seq[byte] = @[]
   payload.appendQuicVarInt(pushId)
   encodeHttp3Frame(H3FrameCancelPush, payload)
 
 proc encodeMaxPushIdFrame*(pushId: uint64): seq[byte] =
+  ## Encode max push ID frame into its wire representation.
   var payload: seq[byte] = @[]
   payload.appendQuicVarInt(pushId)
   encodeHttp3Frame(H3FrameMaxPushId, payload)
 
 proc advertiseMaxPushId*(conn: Http3Connection, pushId: uint64): seq[byte] =
+  ## Advertise a larger HTTP/3 push-ID limit to the peer.
   if not conn.isClient:
     raise newException(ValueError, "MAX_PUSH_ID can only be advertised by HTTP/3 clients")
   validateQuicVarIntRange(pushId, "MAX_PUSH_ID")
@@ -412,6 +428,7 @@ proc advertiseMaxPushId*(conn: Http3Connection, pushId: uint64): seq[byte] =
   conn.hasAdvertisedMaxPushId = true
 
 proc encodePushPromiseFrame*(pushId: uint64, headerBlock: openArray[byte]): seq[byte] =
+  ## Encode push promise frame into its wire representation.
   var payload: seq[byte] = @[]
   payload.appendQuicVarInt(pushId)
   if headerBlock.len > 0:
@@ -419,6 +436,7 @@ proc encodePushPromiseFrame*(pushId: uint64, headerBlock: openArray[byte]): seq[
   encodeHttp3Frame(H3FramePushPromise, payload)
 
 proc openRequest*(conn: Http3Connection): uint64 =
+  ## Open request and initialize its protocol state.
   if not conn.isClient:
     raise newException(ValueError, "request streams can only be opened by HTTP/3 clients")
   if (conn.nextLocalRequestStreamId and 0x03'u64) != 0'u64:
@@ -433,11 +451,13 @@ proc openRequest*(conn: Http3Connection): uint64 =
 proc submitRequest*(conn: Http3Connection,
                     headers: openArray[QpackHeaderField],
                     body: seq[byte] = @[]): seq[byte] =
+  ## Create and submit a new HTTP/3 request stream.
   result = conn.encodeHeadersFrame(headers)
   if body.len > 0:
     result.add encodeDataFrame(body)
 
 proc sendGoaway*(conn: Http3Connection, id: uint64): seq[byte] =
+  ## Send goaway through the active transport.
   validateQuicVarIntRange(id, "GOAWAY ID")
   if not conn.isClient and (id and 0x03'u64) != 0'u64:
     raise newException(ValueError, "server GOAWAY requires a client-initiated bidirectional stream ID")
@@ -463,6 +483,7 @@ proc validatePushPromiseRequestHeaders(streamId: uint64,
 proc createPushPromise*(conn: Http3Connection,
                         pushId: uint64,
                         headers: openArray[QpackHeaderField]): seq[byte] =
+  ## Create an HTTP/3 push promise and reserve its push ID.
   if conn.isClient:
     raise newException(ValueError, "PUSH_PROMISE can only be sent by HTTP/3 servers")
   if not conn.hasPeerMaxPushId:
@@ -498,9 +519,11 @@ proc createPushPromise*(conn: Http3Connection,
   conn.pushPromises[pushId] = @headers
 
 proc clearUniStreamState(conn: Http3Connection, streamId: uint64)
+## Discard bookkeeping for a closed HTTP/3 request stream.
 proc clearRequestStreamState*(conn: Http3Connection, streamId: uint64)
 
 proc cancelPush*(conn: Http3Connection, pushId: uint64): seq[byte] =
+  ## Cancel push and notify its waiters.
   if not conn.isClient:
     raise newException(ValueError, "CANCEL_PUSH can only be sent by HTTP/3 clients")
   validateQuicVarIntRange(pushId, "CANCEL_PUSH ID")
@@ -515,6 +538,7 @@ proc registerWebTransportSession*(conn: Http3Connection,
                                   streamId: uint64,
                                   authority: string,
                                   path: string): WebTransportSession =
+  ## Register web transport session with the current http3 connection.
   let session =
     if conn.isClient:
       openWebTransportSession(sessionId = streamId, authority = authority, path = path)
@@ -527,6 +551,7 @@ proc registerMasqueUdpSession*(conn: Http3Connection,
                                streamId: uint64,
                                authority: string,
                                targetHostPort: string): MasqueSession =
+  ## Register masque UDP session with the current http3 connection.
   let session = connectUdp(authority, targetHostPort)
   conn.masqueSessions[streamId] = session
   session
@@ -535,6 +560,7 @@ proc registerMasqueIpSession*(conn: Http3Connection,
                               streamId: uint64,
                               authority: string,
                               targetIpPrefix: string): MasqueSession =
+  ## Register masque ip session with the current http3 connection.
   let session = connectIp(authority, targetIpPrefix)
   conn.masqueSessions[streamId] = session
   session
@@ -1390,6 +1416,7 @@ proc processControlStreamBuffer(conn: Http3Connection,
 proc processControlStreamData*(conn: Http3Connection,
                                streamId: uint64,
                                payload: openArray[byte]): seq[Http3Event] =
+  ## Parse buffered HTTP/3 control-stream data.
   if streamId in conn.failedUniStreamErrorCodes:
     return @[conn.uniStreamFatalEvent(streamId)]
   if streamId notin conn.uniStreamBuffers:
@@ -1407,6 +1434,7 @@ proc processRequestStreamData*(conn: Http3Connection,
                                payload: openArray[byte],
                                allowInformationalHeaders: bool = false,
                                streamRole: Http3StreamRole = h3srRequest): seq[Http3Event] =
+  ## Parse buffered HTTP/3 request-stream data.
   if streamId in conn.failedRequestStreamErrorCodes:
     return @[conn.requestStreamFatalEvent(streamId)]
   if streamId notin conn.requestStreamBuffers:
@@ -1604,6 +1632,7 @@ proc processRequestStreamData*(conn: Http3Connection,
     conn.clearUniStreamState(streamId)
 
 proc clearRequestStreamState*(conn: Http3Connection, streamId: uint64) =
+  ## Discard bookkeeping for a closed HTTP/3 request stream.
   if streamId in conn.qpackBlockedRequestStreams:
     let wasCounted =
       streamId in conn.qpackBlockedRequestStreamCounted and
@@ -1655,6 +1684,7 @@ proc finalizeRequestStream*(conn: Http3Connection, streamId: uint64): seq[Http3E
       H3ErrFrameError
     )
 
+## Feed bytes into an HTTP/3 unidirectional stream.
 proc ingestUniStreamData*(conn: Http3Connection,
                           streamId: uint64,
                           payload: openArray[byte]): seq[Http3Event]
@@ -1723,16 +1753,19 @@ proc finalizeUniStream*(conn: Http3Connection, streamId: uint64): seq[Http3Event
     conn.clearUniStreamState(streamId)
 
 proc requestStreamBufferedBytes*(conn: Http3Connection, streamId: uint64): int =
+  ## Return the bytes buffered for one HTTP/3 request stream.
   if streamId in conn.requestStreamBuffers:
     return conn.requestStreamBuffers[streamId].len
   0
 
 proc totalRequestBufferedBytes*(conn: Http3Connection): int =
+  ## Return the bytes buffered across HTTP/3 request streams.
   if conn.isNil:
     return 0
   conn.totalRequestStreamBufferedBytes
 
 proc totalUniBufferedBytes*(conn: Http3Connection): int =
+  ## Return the bytes buffered across HTTP/3 unidirectional streams.
   if conn.isNil:
     return 0
   conn.totalUniStreamBufferedBytes
@@ -1796,6 +1829,7 @@ proc drainQpackDecoderInstructions(conn: Http3Connection,
 proc ingestUniStreamData*(conn: Http3Connection,
                           streamId: uint64,
                           payload: openArray[byte]): seq[Http3Event] =
+  ## Feed bytes into an HTTP/3 unidirectional stream.
   if streamId in conn.failedUniStreamErrorCodes:
     if streamId in conn.uniStreamBuffers:
       conn.setUniStreamBuffer(streamId, @[])
@@ -1941,6 +1975,7 @@ proc ingestUniStreamData*(conn: Http3Connection,
 proc encodeH3DatagramForWebTransport*(conn: Http3Connection,
                                       sessionStreamId: uint64,
                                       payload: openArray[byte]): seq[byte] =
+  ## Encode h3 datagram for web transport into its wire representation.
   discard conn
   encodeWebTransportDatagram(sessionStreamId, payload)
 
@@ -1948,12 +1983,14 @@ proc encodeH3DatagramForMasque*(conn: Http3Connection,
                                 streamId: uint64,
                                 contextId: uint64,
                                 payload: openArray[byte]): seq[byte] =
+  ## Encode h3 datagram for masque into its wire representation.
   discard conn
   result = @[]
   result.appendQuicVarInt(streamId)
   result.add encodeMasqueDatagramWire(contextId, payload)
 
 proc ingestH3Datagram*(conn: Http3Connection, payload: openArray[byte]): bool =
+  ## Dispatch an incoming HTTP/3 datagram to its session.
   if conn.isNil or payload.len == 0:
     return false
   if not conn.canSendH3Datagrams():
@@ -1981,11 +2018,13 @@ proc ingestH3Datagram*(conn: Http3Connection, payload: openArray[byte]): bool =
   false
 
 proc hasMasqueSession*(conn: Http3Connection, streamId: uint64): bool =
+  ## Return whether the stream owns a MASQUE session.
   if conn.isNil:
     return false
   streamId in conn.masqueSessions
 
 proc hasWebTransportSession*(conn: Http3Connection, streamId: uint64): bool =
+  ## Return whether the stream owns a WebTransport session.
   if conn.isNil:
     return false
   streamId in conn.webTransportSessions
@@ -1993,6 +2032,7 @@ proc hasWebTransportSession*(conn: Http3Connection, streamId: uint64): bool =
 proc ingestMasqueCapsuleData*(conn: Http3Connection,
                               streamId: uint64,
                               payload: openArray[byte]): bool =
+  ## Feed capsule-protocol bytes into a MASQUE session.
   if conn.isNil or streamId notin conn.masqueSessions:
     return false
   if streamId notin conn.masqueCapsuleBuffers:
@@ -2025,6 +2065,7 @@ proc ingestMasqueCapsuleData*(conn: Http3Connection,
   true
 
 proc clearMasqueSessionState*(conn: Http3Connection, streamId: uint64) =
+  ## Discard state for a closed MASQUE session.
   if conn.isNil:
     return
   if streamId in conn.masqueSessions:
@@ -2033,30 +2074,35 @@ proc clearMasqueSessionState*(conn: Http3Connection, streamId: uint64) =
     conn.masqueCapsuleBuffers.del(streamId)
 
 proc clearWebTransportSessionState*(conn: Http3Connection, streamId: uint64) =
+  ## Discard state for a closed WebTransport session.
   if conn.isNil:
     return
   if streamId in conn.webTransportSessions:
     conn.webTransportSessions.del(streamId)
 
 proc popWebTransportOutgoingDatagrams*(conn: Http3Connection): seq[seq[byte]] =
+  ## Drain WebTransport datagrams ready for transmission.
   for streamId, session in conn.webTransportSessions:
     let pending = session.popOutgoingDatagrams()
     for d in pending:
       result.add encodeWebTransportDatagram(streamId, d)
 
 proc popMasqueOutgoingDatagrams*(conn: Http3Connection): seq[seq[byte]] =
+  ## Drain MASQUE datagrams ready for transmission.
   for streamId, session in conn.masqueSessions:
     let pending = session.popOutgoingDatagrams()
     for d in pending:
       result.add conn.encodeH3DatagramForMasque(streamId, d.contextId, d.payload)
 
 proc popMasqueOutgoingCapsulesByStream*(conn: Http3Connection): seq[tuple[streamId: uint64, capsules: seq[MasqueCapsule]]] =
+  ## Drain MASQUE capsules grouped by request stream.
   for streamId, session in conn.masqueSessions:
     let pending = session.popOutgoingCapsules()
     if pending.len > 0:
       result.add (streamId: streamId, capsules: pending)
 
 proc popMasqueOutgoingCapsules*(conn: Http3Connection): seq[MasqueCapsule] =
+  ## Drain MASQUE capsules ready for transmission.
   let byStream = conn.popMasqueOutgoingCapsulesByStream()
   for item in byStream:
     if item.capsules.len > 0:

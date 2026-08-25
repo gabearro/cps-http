@@ -41,6 +41,7 @@ proc newHttp3ServerSession*(connId: seq[byte],
                             handler: HttpHandler,
                             maxRequestBodySize: int = 10 * 1024 * 1024,
                             enableDatagram: bool = true): Http3ServerSession =
+  ## Create a new http3 server session.
   let conn = newHttp3Connection(isClient = false, useRfcQpackWire = true)
   if not enableDatagram:
     conn.setLocalSettingValue(H3SettingH3Datagram, 0'u64)
@@ -648,27 +649,34 @@ proc createPushPromise*(session: Http3ServerSession,
   result.add promise
 
 proc cancelPush*(session: Http3ServerSession, pushId: uint64): seq[byte] =
+  ## Cancel push and notify its waiters.
   session.conn.cancelPush(pushId)
 
 proc pendingRequestStreamIds*(session: Http3ServerSession): seq[uint64] =
+  ## Return the IDs of request streams waiting for application dispatch.
   for streamId in session.pendingRequests.keys:
     result.add streamId
 
 proc hasPendingRequestStream*(session: Http3ServerSession, streamId: uint64): bool =
+  ## Return whether the request stream is waiting for application dispatch.
   streamId in session.pendingRequests
 
 proc hasPendingRequests*(session: Http3ServerSession): bool {.inline.} =
+  ## Return whether any HTTP/3 requests await application dispatch.
   not session.isNil and session.pendingRequests.len > 0
 
 proc qpackBlockedRequestStreamIds*(session: Http3ServerSession): seq[uint64] =
+  ## Return the IDs of request streams blocked on QPACK inserts.
   for streamId in session.qpackBlockedRequestStreams.keys:
     result.add streamId
 
 proc isQpackBlockedRequestStream*(session: Http3ServerSession, streamId: uint64): bool =
+  ## Return whether the request stream is blocked on QPACK inserts.
   streamId in session.qpackBlockedRequestStreams
 
 proc routeH3Datagram*(session: Http3ServerSession,
                       payload: openArray[byte]): tuple[consumed: bool, outgoing: seq[seq[byte]]] =
+  ## Route an HTTP/3 datagram and collect application replies ready to send.
   if session.isNil or session.conn.isNil or payload.len == 0:
     return (consumed: false, outgoing: @[])
   if not session.conn.canSendH3Datagrams():
@@ -683,6 +691,7 @@ proc routeH3Datagram*(session: Http3ServerSession,
     result.outgoing.add masque
 
 proc drainMasqueOutgoingCapsulesByStream*(session: Http3ServerSession): seq[tuple[streamId: uint64, capsules: seq[MasqueCapsule]]] =
+  ## Drain MASQUE capsules grouped by HTTP/3 request stream.
   if session.isNil:
     return @[]
   session.conn.popMasqueOutgoingCapsulesByStream()

@@ -85,6 +85,7 @@ proc entrySize(name, value: string): int =
   name.len + value.len + 32  # RFC 7541 section 4.1
 
 proc initDynamicTable*(maxSize: int = 4096): DynamicTable =
+  ## Initialize dynamic table.
   DynamicTable(maxSize: maxSize)
 
 proc evict(dt: var DynamicTable) =
@@ -93,6 +94,7 @@ proc evict(dt: var DynamicTable) =
     dt.size -= entrySize(name, value)
 
 proc add*(dt: var DynamicTable, name, value: string) =
+  ## Insert a header field into the HPACK dynamic table.
   let eSize = entrySize(name, value)
   # Evict until we have room
   while dt.size + eSize > dt.maxSize and dt.entries.len > 0:
@@ -122,6 +124,7 @@ proc lookup(index: int, dt: DynamicTable): (string, string) =
 # ============================================================
 
 proc encodeInteger*(value: int, prefixBits: int, firstByte: byte): seq[byte] =
+  ## Encode integer into its wire representation.
   let maxPrefix = (1 shl prefixBits) - 1
   if value < maxPrefix:
     result = @[firstByte or byte(value)]
@@ -134,6 +137,7 @@ proc encodeInteger*(value: int, prefixBits: int, firstByte: byte): seq[byte] =
     result.add byte(remaining)
 
 proc decodeInteger*(data: openArray[byte], offset: var int, prefixBits: int): int =
+  ## Decode integer from its wire representation.
   let maxPrefix = (1 shl prefixBits) - 1
   result = int(data[offset] and byte(maxPrefix))
   offset += 1
@@ -547,6 +551,7 @@ proc huffmanEncode*(s: string): seq[byte] =
 # ============================================================
 
 proc encodeString*(s: string, huffman: bool = false): seq[byte] =
+  ## Encode string into its wire representation.
   if huffman:
     let encoded = huffmanEncode(s)
     result = encodeInteger(encoded.len, 7, 0x80)
@@ -558,6 +563,7 @@ proc encodeString*(s: string, huffman: bool = false): seq[byte] =
     result.add byte(c)
 
 proc decodeString*(data: openArray[byte], offset: var int): string =
+  ## Decode string from its wire representation.
   let isHuffman = (data[offset] and 0x80) != 0
   let length = decodeInteger(data, offset, 7)
   if isHuffman:
@@ -574,6 +580,7 @@ proc decodeString*(data: openArray[byte], offset: var int): string =
 # ============================================================
 
 proc initHpackEncoder*(maxSize: int = 4096): HpackEncoder =
+  ## Initialize hpack encoder.
   HpackEncoder(dynTable: initDynamicTable(maxSize))
 
 proc findInStaticTable(name, value: string): (int, bool) =
@@ -589,6 +596,7 @@ proc findInStaticTable(name, value: string): (int, bool) =
   return (nameOnlyIdx, false)
 
 proc encode*(enc: var HpackEncoder, headers: seq[(string, string)]): seq[byte] =
+  ## Encode hpack into its wire representation.
   result = @[]
   for (name, value) in headers:
     let (staticIdx, exactMatch) = findInStaticTable(name, value)
@@ -613,9 +621,11 @@ proc encode*(enc: var HpackEncoder, headers: seq[(string, string)]): seq[byte] =
 # ============================================================
 
 proc initHpackDecoder*(maxSize: int = 4096): HpackDecoder =
+  ## Initialize hpack decoder.
   HpackDecoder(dynTable: initDynamicTable(maxSize))
 
 proc decode*(dec: var HpackDecoder, data: openArray[byte]): seq[(string, string)] =
+  ## Decode hpack from its wire representation.
   result = @[]
   var offset = 0
 

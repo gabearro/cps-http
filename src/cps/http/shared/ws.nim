@@ -66,6 +66,7 @@ type
     closeCode*: uint16
 
 proc newWsProtocolError*(code: uint16, msg: string): ref WsProtocolError =
+  ## Create a new ws protocol error.
   let err = newException(WsProtocolError, msg)
   err.closeCode = code
   err

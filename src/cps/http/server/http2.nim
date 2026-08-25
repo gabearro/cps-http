@@ -108,6 +108,7 @@ proc newHttp2ServerConnection*(s: AsyncStream, config: HttpServerConfig,
                                handler: HttpHandler,
                                shutdownFlag: ptr bool = nil,
                                remoteAddr: string = ""): Http2ServerConnection =
+  ## Create a new http2 server connection.
   let reader = newBufferedReader(s)
   Http2ServerConnection(
     stream: s,
@@ -225,6 +226,7 @@ proc enqueueFrame(conn: Http2ServerConnection, frame: Http2Frame): CpsVoidFuture
   fut
 
 proc sendFrame*(conn: Http2ServerConnection, frame: Http2Frame): CpsVoidFuture {.cps.} =
+  ## Send frame through the active transport.
   await enqueueFrame(conn, frame)
 
 proc sendRstStream(conn: Http2ServerConnection, streamId: uint32,
@@ -242,6 +244,7 @@ proc sendRstStream(conn: Http2ServerConnection, streamId: uint32,
     payload: payload
   ))
 
+## Send go away through the active transport.
 proc sendGoAway*(conn: Http2ServerConnection, errorCode: uint32,
                  lastStreamId: uint32 = 0'u32): CpsVoidFuture {.cps.} =
   if conn.goAwaySent:
@@ -345,6 +348,7 @@ proc currentPeerMaxFrameSize(conn: Http2ServerConnection): int {.inline.} =
   conn.peerMaxFrameSize
 
 proc sendServerSettings*(conn: Http2ServerConnection): CpsVoidFuture {.cps.} =
+  ## Send server settings through the active transport.
   var payload: seq[byte]
   let maxStreams = conn.maxConcurrentStreams.uint32
   payload.add byte((SettingsMaxConcurrentStreams shr 8) and 0xFF)
@@ -378,11 +382,13 @@ proc sendServerSettings*(conn: Http2ServerConnection): CpsVoidFuture {.cps.} =
   ))
 
 proc readConnectionPreface*(conn: Http2ServerConnection): CpsVoidFuture {.cps.} =
+  ## Read and validate the HTTP/2 client connection preface.
   let preface = await conn.reader.readExact(ConnectionPreface.len)
   if preface != ConnectionPreface:
     raise newException(ValueError, "Invalid HTTP/2 connection preface")
 
 proc recvServerFrame*(conn: Http2ServerConnection): CpsFuture[Http2Frame] {.cps.} =
+  ## Receive server frame from the active transport.
   let headerStr = await conn.reader.readExact(9)
   if headerStr.len < 9:
     raise newException(system.IOError, "Short frame header")
@@ -843,6 +849,7 @@ proc waitForSendWindow(conn: Http2ServerConnection,
 
 proc sendResponseData*(conn: Http2ServerConnection, streamId: uint32,
                        data: seq[byte], endStream: bool): CpsVoidFuture {.cps.} =
+  ## Send response data through the active transport.
   if streamId notin conn.streams:
     return
 
@@ -986,6 +993,7 @@ proc buildHttpRequest(s: Http2ServerStream,
 
 proc dispatchHttp2Handler*(conn: Http2ServerConnection, streamId: uint32,
                            req: HttpRequest): CpsVoidFuture {.cps.} =
+  ## Dispatch an HTTP/2 request to its application handler.
   var resp: HttpResponseBuilder
   try:
     resp = await conn.handler(req)
@@ -1223,6 +1231,7 @@ proc processContinuationFrame(conn: Http2ServerConnection,
 
 proc processServerFrame*(conn: Http2ServerConnection,
                          frame: Http2Frame): CpsVoidFuture {.cps.} =
+  ## Apply an incoming HTTP/2 frame to server connection state.
   if conn.continuationStreamId != 0 and
       (frame.frameType != FrameContinuation or frame.streamId != conn.continuationStreamId):
     await failConnection(conn, H2ErrProtocolError)
@@ -1494,6 +1503,7 @@ proc handleHttp2Connection*(stream: AsyncStream, config: HttpServerConfig,
                             handler: HttpHandler,
                             remoteAddr: string = "",
                             shutdownFlag: ptr bool = nil): CpsVoidFuture {.cps.} =
+  ## Run the HTTP/2 server loop for one connection.
   let conn = newHttp2ServerConnection(stream, config, handler, shutdownFlag, remoteAddr)
   var sendTerminalGoAway = false
   var terminalGoAwayErr = H2ErrInternalError

@@ -107,6 +107,7 @@ proc newHttp2StreamAdapter*(streamId: uint32,
                             sendHeadersProc: AdapterSendHeadersProc,
                             sendDataProc: AdapterSendDataProc,
                             closeWriteProc: AdapterCloseWriteProc = nil): Http2StreamAdapter =
+  ## Create a new http2 stream adapter.
   result = Http2StreamAdapter(
     streamId: streamId,
     sendHeadersProc: sendHeadersProc,
@@ -138,6 +139,7 @@ proc sendResponseHeaders*(a: Http2StreamAdapter, statusCode: int,
   a.responseHeadersSent = true
 
 proc hasSentResponseHeaders*(a: Http2StreamAdapter): bool {.inline.} =
+  ## Return whether response headers have already been sent.
   if a.isNil:
     return false
   a.responseHeadersSent

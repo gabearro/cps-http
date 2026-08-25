@@ -64,12 +64,14 @@ proc raiseHttp3ProtocolError(msg: string, errorCode: uint64, streamId: uint64) {
   raise err
 
 proc newHttp3ClientSession*(enableDatagram: bool = true): Http3ClientSession =
+  ## Create a new http3 client session.
   let conn = newHttp3Connection(isClient = true, useRfcQpackWire = true)
   if not enableDatagram:
     conn.setLocalSettingValue(H3SettingH3Datagram, 0'u64)
   Http3ClientSession(conn: conn)
 
 proc drainApplicationDatagrams*(session: Http3ClientSession): seq[seq[byte]] =
+  ## Drain application datagrams received by the HTTP/3 session.
   if session.isNil or session.conn.isNil:
     return @[]
   result = session.conn.popWebTransportOutgoingDatagrams()
@@ -79,6 +81,7 @@ proc drainApplicationDatagrams*(session: Http3ClientSession): seq[seq[byte]] =
 
 proc ingestApplicationDatagram*(session: Http3ClientSession,
                                 payload: openArray[byte]): bool =
+  ## Ingest application datagram into the http3 state.
   if session.isNil or session.conn.isNil:
     return false
   if not session.conn.canSendH3Datagrams():
@@ -754,6 +757,7 @@ proc encodeRequestFrames*(session: Http3ClientSession,
                           authority: string,
                           headers: openArray[(string, string)],
                           body: string): seq[byte] =
+  ## Encode request frames into its wire representation.
   let hdrs = buildRequestHeaders(meth, path, authority, headers)
   validateRequestContentLength(hdrs, body.len)
   validatePeerFieldSectionSize(session.conn, hdrs)
@@ -764,6 +768,7 @@ proc decodeResponseFrames*(session: Http3ClientSession,
                            streamId: uint64,
                            payload: openArray[byte],
                            requestMethod: string = ""): Http3ClientResponse =
+  ## Decode response frames from its wire representation.
   if not isBidirectionalStream(streamId) or not isClientInitiatedStream(streamId):
     raiseHttp3ProtocolError(
       "HTTP/3 response stream has invalid id: " & $streamId,
@@ -867,6 +872,7 @@ proc parseAuthorityPort(authority: string): int =
     0
 
 proc isUsable*(transport: Http3ClientTransport): bool =
+  ## Return whether the HTTP/3 connection can accept another request.
   if transport.isNil or transport.endpoint.isNil or transport.conn.isNil or transport.session.isNil:
     return false
   if not transport.endpoint.running:
@@ -874,6 +880,7 @@ proc isUsable*(transport: Http3ClientTransport): bool =
   transport.conn.state notin {qcsClosed, qcsDraining}
 
 proc close*(transport: Http3ClientTransport, closeSocket: bool = true) =
+  ## Close http3 and release its owned resources.
   if transport.isNil or transport.endpoint.isNil:
     return
   transport.endpoint.shutdown(closeSocket = closeSocket)
@@ -978,6 +985,7 @@ proc newHttp3ClientTransport*(host: string,
                               enableDatagram: bool = true,
                               enable0Rtt: bool = true,
                               endpointConfig: QuicEndpointConfig = defaultQuicEndpointConfig()): CpsFuture[Http3ClientTransport] {.cps.} =
+  ## Create a new http3 client transport.
   if host.len == 0:
     raise newException(ValueError, "HTTP/3 transport requires non-empty host")
   if port <= 0 or port > 65535:
@@ -1064,6 +1072,7 @@ proc doHttp3RequestOnTransport*(transport: Http3ClientTransport,
                                 headers: seq[(string, string)],
                                 body: string,
                                 timeoutMs: int = 5_000): CpsFuture[Http3ClientResponse] {.cps.} =
+  ## Perform an HTTP/3 request over an existing QUIC transport.
   if not transport.isUsable():
     raise newException(ValueError, "HTTP/3 transport is not usable")
   if transport.connectionError.len > 0:
@@ -1181,6 +1190,7 @@ proc doHttp3Request*(host: string,
                      enableDatagram: bool = true,
                      enable0Rtt: bool = true,
                      endpointConfig: QuicEndpointConfig = defaultQuicEndpointConfig()): CpsFuture[Http3ClientResponse] {.cps.} =
+  ## Perform an HTTP/3 request.
   if host.len == 0:
     raise newException(ValueError, "HTTP/3 request requires non-empty host")
 

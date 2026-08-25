@@ -100,6 +100,7 @@ const
   ]
 
 proc newQpackEncoder*(maxTableCapacity: int = 4096, blockedStreamsLimit: int = 16): QpackEncoder =
+  ## Create a new qpack encoder.
   QpackEncoder(
     maxTableCapacity: maxTableCapacity,
     blockedStreamsLimit: blockedStreamsLimit,
@@ -110,6 +111,7 @@ proc newQpackEncoder*(maxTableCapacity: int = 4096, blockedStreamsLimit: int = 1
   )
 
 proc newQpackDecoder*(maxTableCapacity: int = 4096, blockedStreamsLimit: int = 16): QpackDecoder =
+  ## Create a new qpack decoder.
   QpackDecoder(
     maxTableCapacity: maxTableCapacity,
     blockedStreamsLimit: blockedStreamsLimit,
@@ -212,18 +214,22 @@ proc checkedIncCounter(counter: var uint64, label: string) =
   inc counter
 
 proc markBlocked*(enc: QpackEncoder) =
+  ## Mark blocked in the current protocol state.
   if enc.blockedStreams < enc.blockedStreamsLimit:
     inc enc.blockedStreams
 
 proc markUnblocked*(enc: QpackEncoder) =
+  ## Mark unblocked in the current protocol state.
   if enc.blockedStreams > 0:
     dec enc.blockedStreams
 
 proc markBlocked*(dec: QpackDecoder) =
+  ## Mark blocked in the current protocol state.
   if dec.blockedStreams < dec.blockedStreamsLimit:
     inc dec.blockedStreams
 
 proc markUnblocked*(dec: QpackDecoder) =
+  ## Mark unblocked in the current protocol state.
   if dec.blockedStreams > 0:
     dec dec.blockedStreams
 
@@ -262,6 +268,7 @@ proc encodeHeaders*(enc: QpackEncoder, headers: openArray[QpackHeaderField]): se
       checkedIncCounter(enc.insertCount, "QPACK encoder insert count")
 
 proc decodeHeaders*(dec: QpackDecoder, encoded: openArray[byte]): seq[QpackHeaderField] =
+  ## Decode headers from its wire representation.
   var off = 0
   let prefix = decodeHeaderBlockPrefix(encoded, off)
   dec.requiredInsertCount = prefix.requiredInsertCount
@@ -506,10 +513,12 @@ proc encodeHeadersRfcWireWithInstructions*(enc: QpackEncoder,
     result.add line
 
 proc encodeHeadersRfcWire*(enc: QpackEncoder, headers: openArray[QpackHeaderField]): seq[byte] =
+  ## Encode headers rfc wire into its wire representation.
   var ignoredInstructions: seq[QpackEncoderInstruction] = @[]
   enc.encodeHeadersRfcWireWithInstructions(headers, ignoredInstructions)
 
 proc decodeHeadersRfcWire*(dec: QpackDecoder, encoded: openArray[byte]): seq[QpackHeaderField] =
+  ## Decode headers rfc wire from its wire representation.
   var off = 0
   let prefix = decodeRfcHeaderBlockPrefix(dec, encoded, off)
   dec.requiredInsertCount = prefix.requiredInsertCount
@@ -582,6 +591,7 @@ proc decodeHeadersRfcWire*(dec: QpackDecoder, encoded: openArray[byte]): seq[Qpa
     dec.markUnblocked()
 
 proc encodeEncoderInstruction*(inst: QpackEncoderInstruction): seq[byte] =
+  ## Encode encoder instruction into its wire representation.
   result = @[]
   case inst.kind
   of qeikInsertLiteral:
@@ -609,6 +619,7 @@ proc encodeEncoderInstruction*(inst: QpackEncoderInstruction): seq[byte] =
 
 proc decodeEncoderInstructionPrefix*(payload: openArray[byte],
                                      offset: var int): QpackEncoderInstruction =
+  ## Decode encoder instruction prefix from its wire representation.
   var off = offset
   if payload.len == 0:
     raise newException(ValueError, "empty QPACK encoder instruction")
@@ -670,12 +681,14 @@ proc decodeEncoderInstructionPrefix*(payload: openArray[byte],
   offset = off
 
 proc decodeEncoderInstruction*(payload: openArray[byte]): QpackEncoderInstruction =
+  ## Decode encoder instruction from its wire representation.
   var off = 0
   result = decodeEncoderInstructionPrefix(payload, off)
   if off != payload.len:
     raise newException(ValueError, "trailing bytes in QPACK encoder instruction")
 
 proc applyEncoderInstruction*(dec: QpackDecoder, inst: QpackEncoderInstruction) =
+  ## Apply one QPACK encoder-stream instruction.
   case inst.kind
   of qeikInsertLiteral:
     let hf: QpackHeaderField = (inst.name, inst.value)
@@ -705,6 +718,7 @@ proc applyEncoderInstruction*(dec: QpackDecoder, inst: QpackEncoderInstruction) 
     trimDynamicTable(dec.dynamicTable, dec.maxTableCapacity)
 
 proc encodeDecoderInstruction*(inst: QpackDecoderInstruction): seq[byte] =
+  ## Encode decoder instruction into its wire representation.
   result = @[]
   case inst.kind
   of qdikSectionAck:
@@ -719,6 +733,7 @@ proc encodeDecoderInstruction*(inst: QpackDecoderInstruction): seq[byte] =
 
 proc decodeDecoderInstructionPrefix*(payload: openArray[byte],
                                      offset: var int): QpackDecoderInstruction =
+  ## Decode decoder instruction prefix from its wire representation.
   var off = offset
   if payload.len == 0:
     raise newException(ValueError, "empty QPACK decoder instruction")
@@ -751,12 +766,14 @@ proc decodeDecoderInstructionPrefix*(payload: openArray[byte],
   offset = off
 
 proc decodeDecoderInstruction*(payload: openArray[byte]): QpackDecoderInstruction =
+  ## Decode decoder instruction from its wire representation.
   var off = 0
   result = decodeDecoderInstructionPrefix(payload, off)
   if off != payload.len:
     raise newException(ValueError, "trailing bytes in QPACK decoder instruction")
 
 proc applyDecoderInstruction*(enc: QpackEncoder, inst: QpackDecoderInstruction) =
+  ## Apply one QPACK decoder-stream instruction.
   case inst.kind
   of qdikSectionAck:
     discard inst.streamId

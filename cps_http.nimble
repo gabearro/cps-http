@@ -12,6 +12,9 @@ requires "https://github.com/gabearro/cps-quic == 1.0.1"
 requires "checksums >= 0.2.2"
 requires "zippy >= 0.10.0"
 
+task checkDocs, "Verify developer documentation coverage":
+  exec "python3 scripts/check_dev_docs.py"
+
 task test, "Run the project test suite":
   exec "nim c -r tests/http/test_compression.nim"
   exec "nim c -r tests/http/test_http_dsl.nim"

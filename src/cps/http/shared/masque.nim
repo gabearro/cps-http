@@ -77,13 +77,16 @@ proc newMasqueSession(mode: MasqueMode, authority: string, target: string): Masq
   )
 
 proc connectUdp*(authority: string, targetHostPort: string): MasqueSession =
+  ## Create a MASQUE CONNECT-UDP request.
   newMasqueSession(mmConnectUdp, authority, targetHostPort)
 
 proc connectIp*(authority: string, targetIpPrefix: string): MasqueSession =
+  ## Create a MASQUE CONNECT-IP request.
   newMasqueSession(mmConnectIp, authority, targetIpPrefix)
 
 proc buildMasqueConnectUdpHeaders*(authority: string,
                                    targetHostPort: string): seq[QpackHeaderField] =
+  ## Build masque connect UDP headers from the supplied state.
   @[
     (":method", "CONNECT"),
     (":scheme", "https"),
@@ -96,6 +99,7 @@ proc buildMasqueConnectUdpHeaders*(authority: string,
 proc buildMasqueConnectIpHeaders*(authority: string,
                                   targetIpPrefix: string,
                                   draftVersion: string = MasqueConnectIpDraft): seq[QpackHeaderField] =
+  ## Build masque connect ip headers from the supplied state.
   @[
     (":method", "CONNECT"),
     (":scheme", "https"),
@@ -107,6 +111,7 @@ proc buildMasqueConnectIpHeaders*(authority: string,
   ]
 
 proc parseMasqueConnectRequest*(headers: openArray[QpackHeaderField]): MasqueConnectRequest =
+  ## Parse masque connect request from its encoded representation.
   var protocol = ""
   var target = ""
   var authority = ""
@@ -148,12 +153,14 @@ proc parseMasqueConnectRequest*(headers: openArray[QpackHeaderField]): MasqueCon
   )
 
 proc isMasqueConnectRequest*(headers: openArray[QpackHeaderField]): bool =
+  ## Return whether the headers describe a MASQUE CONNECT request.
   let req = parseMasqueConnectRequest(headers)
   req.httpMethod == "CONNECT" and
     req.protocol in [MasqueConnectUdpProtocol, MasqueConnectIpProtocol] and
     req.target.len > 0
 
 proc openDatagramContext*(session: MasqueSession, label: string = ""): uint64 =
+  ## Open datagram context and initialize its protocol state.
   if session.isNil or session.closed:
     raise newException(ValueError, "MASQUE session is closed")
   if session.nextContextId > MasqueMaxDatagramContextId:
@@ -166,11 +173,13 @@ proc openDatagramContext*(session: MasqueSession, label: string = ""): uint64 =
   session.contexts[result] = label
 
 proc sendCapsule*(session: MasqueSession, capsuleType: uint64, payload: openArray[byte]) =
+  ## Send capsule through the active transport.
   if session.isNil or session.closed:
     raise newException(ValueError, "MASQUE session is closed")
   session.outgoingCapsules.add MasqueCapsule(capsuleType: capsuleType, payload: @payload)
 
 proc recvCapsule*(session: MasqueSession): MasqueCapsule =
+  ## Receive capsule from the active transport.
   if session.isNil or session.incomingCapsules.len == 0:
     return MasqueCapsule(capsuleType: 0'u64, payload: @[])
   result = session.incomingCapsules[0]
@@ -196,6 +205,7 @@ proc enforceIncomingCapsuleLimits(session: MasqueSession) =
       session.incomingCapsuleBytes = max(0, session.incomingCapsuleBytes - dropped)
 
 proc ingestCapsule*(session: MasqueSession, capsuleType: uint64, payload: openArray[byte]) =
+  ## Parse and queue an incoming MASQUE capsule.
   if session.isNil or session.closed:
     return
   if session.maxIncomingCapsuleBytes > 0 and payload.len > session.maxIncomingCapsuleBytes:
@@ -206,6 +216,7 @@ proc ingestCapsule*(session: MasqueSession, capsuleType: uint64, payload: openAr
   session.enforceIncomingCapsuleLimits()
 
 proc sendDatagram*(session: MasqueSession, contextId: uint64, payload: openArray[byte]) =
+  ## Send datagram through the active transport.
   if session.isNil or session.closed:
     raise newException(ValueError, "MASQUE session is closed")
   if contextId notin session.contexts:
@@ -213,6 +224,7 @@ proc sendDatagram*(session: MasqueSession, contextId: uint64, payload: openArray
   session.outgoingDatagrams.add MasqueDatagram(contextId: contextId, payload: @payload)
 
 proc recvDatagram*(session: MasqueSession): MasqueDatagram =
+  ## Receive datagram from the active transport.
   if session.isNil or session.incomingDatagrams.len == 0:
     return MasqueDatagram(contextId: 0'u64, payload: @[])
   result = session.incomingDatagrams[0]
@@ -238,6 +250,7 @@ proc enforceIncomingDatagramLimits(session: MasqueSession) =
       session.incomingDatagramBytes = max(0, session.incomingDatagramBytes - dropped)
 
 proc ingestDatagram*(session: MasqueSession, contextId: uint64, payload: openArray[byte]) =
+  ## Parse and queue an incoming protocol datagram.
   if session.isNil or session.closed:
     return
   if contextId notin session.contexts:
@@ -251,43 +264,51 @@ proc ingestDatagram*(session: MasqueSession, contextId: uint64, payload: openArr
   session.enforceIncomingDatagramLimits()
 
 proc closeSession*(session: MasqueSession) =
+  ## Close session and release its owned resources.
   if session.isNil:
     return
   session.closed = true
 
 proc queuedIncomingCapsules*(session: MasqueSession): int =
+  ## Return the number of queued incoming MASQUE capsules.
   if session.isNil:
     return 0
   session.incomingCapsules.len
 
 proc queuedIncomingCapsuleBytes*(session: MasqueSession): int =
+  ## Return the bytes held by queued incoming MASQUE capsules.
   if session.isNil:
     return 0
   session.incomingCapsuleBytes
 
 proc queuedIncomingDatagrams*(session: MasqueSession): int =
+  ## Return the number of queued incoming datagrams.
   if session.isNil:
     return 0
   session.incomingDatagrams.len
 
 proc queuedIncomingDatagramBytes*(session: MasqueSession): int =
+  ## Return the bytes held by queued incoming datagrams.
   if session.isNil:
     return 0
   session.incomingDatagramBytes
 
 proc popOutgoingCapsules*(session: MasqueSession): seq[MasqueCapsule] =
+  ## Drain the MASQUE capsules waiting for transmission.
   if session.isNil:
     return @[]
   result = session.outgoingCapsules
   session.outgoingCapsules = @[]
 
 proc popOutgoingDatagrams*(session: MasqueSession): seq[MasqueDatagram] =
+  ## Drain the MASQUE datagrams waiting for transmission.
   if session.isNil:
     return @[]
   result = session.outgoingDatagrams
   session.outgoingDatagrams = @[]
 
 proc encodeCapsuleWire*(capsuleType: uint64, payload: openArray[byte]): seq[byte] =
+  ## Encode capsule wire into its wire representation.
   result = @[]
   result.appendQuicVarInt(capsuleType)
   result.appendQuicVarInt(uint64(payload.len))
@@ -295,6 +316,7 @@ proc encodeCapsuleWire*(capsuleType: uint64, payload: openArray[byte]): seq[byte
     result.add payload
 
 proc decodeCapsuleWire*(wire: openArray[byte], offset: var int): MasqueCapsule =
+  ## Decode capsule wire from its wire representation.
   let typ = decodeQuicVarInt(wire, offset)
   let len = decodeQuicVarInt(wire, offset)
   if offset + int(len) > wire.len:
@@ -304,12 +326,14 @@ proc decodeCapsuleWire*(wire: openArray[byte], offset: var int): MasqueCapsule =
   offset += int(len)
 
 proc encodeMasqueDatagramWire*(contextId: uint64, payload: openArray[byte]): seq[byte] =
+  ## Encode masque datagram wire into its wire representation.
   result = @[]
   result.appendQuicVarInt(contextId)
   if payload.len > 0:
     result.add payload
 
 proc decodeMasqueDatagramWire*(wire: openArray[byte]): MasqueDatagram =
+  ## Decode masque datagram wire from its wire representation.
   var off = 0
   let contextId = decodeQuicVarInt(wire, off)
   result = MasqueDatagram(

@@ -87,21 +87,25 @@ proc runRequest*(client: TestClient, meth: string, path: string,
   return fut.read()
 
 proc assertStatus*(resp: HttpResponseBuilder, expected: int) =
+  ## Assert that the response status matches the expectation.
   if resp.statusCode != expected:
     raise newException(AssertionDefect,
       "Expected status " & $expected & " but got " & $resp.statusCode)
 
 proc assertBody*(resp: HttpResponseBuilder, expected: string) =
+  ## Assert that the response body matches the expectation.
   if resp.body != expected:
     raise newException(AssertionDefect,
       "Expected body \"" & expected & "\" but got \"" & resp.body & "\"")
 
 proc assertBodyContains*(resp: HttpResponseBuilder, substring: string) =
+  ## Assert that the response body contains matches the expectation.
   if substring notin resp.body:
     raise newException(AssertionDefect,
       "Expected body to contain \"" & substring & "\" but body is \"" & resp.body & "\"")
 
 proc assertHeader*(resp: HttpResponseBuilder, name: string, expected: string) =
+  ## Assert that the response header matches the expectation.
   for (k, v) in resp.headers:
     if k.toLowerAscii == name.toLowerAscii:
       if v == expected:
@@ -113,6 +117,7 @@ proc assertHeader*(resp: HttpResponseBuilder, name: string, expected: string) =
     "Header " & name & " not found in response")
 
 proc assertHeaderContains*(resp: HttpResponseBuilder, name: string, substring: string) =
+  ## Assert that the response header contains matches the expectation.
   for (k, v) in resp.headers:
     if k.toLowerAscii == name.toLowerAscii:
       if substring in v:
@@ -124,6 +129,7 @@ proc assertHeaderContains*(resp: HttpResponseBuilder, name: string, substring: s
     "Header " & name & " not found in response")
 
 proc assertJsonBody*(resp: HttpResponseBuilder, expected: JsonNode) =
+  ## Assert that the response json body matches the expectation.
   let actual = parseJson(resp.body)
   if actual != expected:
     raise newException(AssertionDefect,

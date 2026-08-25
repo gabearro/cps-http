@@ -159,8 +159,12 @@ nim c -r -d:useBoringSSL your_program.nim
 
 ## Development
 
+Read the [HTTP developer guide](docs/development.md) before changing public
+APIs, ownership, protocol state, or execution behavior.
+
 ```sh
 nimble install -d -y
+nimble checkDocs
 nimble test
 ```
 

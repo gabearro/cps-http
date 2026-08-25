@@ -12,6 +12,7 @@ proc connectUdp*(authority: string,
                  targetHostPort: string,
                  policyHook: MasquePolicyHook = nil,
                  handler: MasqueSessionHandler = nil): CpsFuture[masque_shared.MasqueSession] {.cps.} =
+  ## Create a MASQUE CONNECT-UDP request.
   if not policyHook.isNil and not policyHook(mmConnectUdp, authority, targetHostPort):
     raise newException(ValueError, "CONNECT-UDP rejected by MASQUE policy")
   let session = masque_shared.connectUdp(authority, targetHostPort)
@@ -23,6 +24,7 @@ proc connectIp*(authority: string,
                 targetIpPrefix: string,
                 policyHook: MasquePolicyHook = nil,
                 handler: MasqueSessionHandler = nil): CpsFuture[masque_shared.MasqueSession] {.cps.} =
+  ## Create a MASQUE CONNECT-IP request.
   if not policyHook.isNil and not policyHook(mmConnectIp, authority, targetIpPrefix):
     raise newException(ValueError, "CONNECT-IP rejected by MASQUE policy")
   let session = masque_shared.connectIp(authority, targetIpPrefix)
@@ -31,7 +33,9 @@ proc connectIp*(authority: string,
   return session
 
 proc parseConnectRequest*(headers: openArray[(string, string)]): masque_shared.MasqueConnectRequest =
+  ## Parse connect request from its encoded representation.
   masque_shared.parseMasqueConnectRequest(headers)
 
 proc isMasqueConnectRequest*(headers: openArray[(string, string)]): bool =
+  ## Return whether the headers describe a MASQUE CONNECT request.
   masque_shared.isMasqueConnectRequest(headers)

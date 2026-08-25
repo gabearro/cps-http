@@ -67,6 +67,7 @@ type
     statusCode*: int
 
 proc raiseRequestExtractionError*(statusCode: int, msg: string) {.noreturn.} =
+  ## Raise a request-extraction error with the supplied status.
   var err = newException(RequestExtractionError, msg)
   err.statusCode = statusCode
   raise err
@@ -556,6 +557,7 @@ proc chainMiddleware*(middlewares: seq[Middleware], finalHandler: HttpHandler): 
 
 proc jsonResponse*(code: int, body: string,
                     extraHeaders: seq[(string, string)] = @[]): HttpResponseBuilder =
+  ## Build a JSON HTTP response.
   var headers = @[("Content-Type", "application/json")]
   for h in extraHeaders:
     headers.add h
@@ -563,6 +565,7 @@ proc jsonResponse*(code: int, body: string,
 
 proc htmlResponse*(code: int, body: string,
                     extraHeaders: seq[(string, string)] = @[]): HttpResponseBuilder =
+  ## Build an HTML HTTP response.
   var headers = @[("Content-Type", "text/html; charset=utf-8")]
   for h in extraHeaders:
     headers.add h
@@ -570,12 +573,14 @@ proc htmlResponse*(code: int, body: string,
 
 proc textResponse*(code: int, body: string,
                     extraHeaders: seq[(string, string)] = @[]): HttpResponseBuilder =
+  ## Build a plain-text HTTP response.
   var headers = @[("Content-Type", "text/plain; charset=utf-8")]
   for h in extraHeaders:
     headers.add h
   newResponse(code, body, headers)
 
 proc redirectResponse*(location: string, code: int = 302): HttpResponseBuilder =
+  ## Build an HTTP redirect response.
   newResponse(code, "", @[("Location", location)])
 
 # ============================================================

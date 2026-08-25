@@ -93,6 +93,7 @@ type
 
 proc newResponse*(statusCode: int, body: string = "",
                   headers: seq[(string, string)] = @[]): HttpResponseBuilder =
+  ## Create a new response.
   HttpResponseBuilder(
     statusCode: statusCode,
     headers: headers,
@@ -140,12 +141,14 @@ proc ensureContext*(req: var HttpRequest) {.inline.} =
     req.context = newTable[string, string]()
 
 proc getHeader*(req: HttpRequest, name: string): string =
+  ## Return a request header by case-insensitive name.
   for (k, v) in req.headers:
     if eqCaseInsensitive(k, name):
       return v
   return ""
 
 proc getResponseHeader*(resp: HttpResponseBuilder, name: string): string =
+  ## Return a response header by case-insensitive name.
   for (k, v) in resp.headers:
     if eqCaseInsensitive(k, name):
       return v
@@ -177,9 +180,11 @@ proc isValidHeaderValue*(value: string): bool =
   true
 
 proc validateHeaderPair*(name, value: string): bool =
+  ## Validate header pair and reject malformed state.
   isValidHeaderName(name) and isValidHeaderValue(value)
 
 proc validateResponseHeaders*(headers: seq[(string, string)]): bool =
+  ## Validate response headers and reject malformed state.
   for (k, v) in headers:
     if not validateHeaderPair(k, v):
       return false
@@ -244,6 +249,7 @@ proc isTrustedProxyAddress*(ip: string, cidrs: seq[string]): bool =
   false
 
 proc statusMessage*(code: int): string =
+  ## Build the status message wire value.
   case code
   of 200: "OK"
   of 201: "Created"
@@ -306,6 +312,7 @@ proc newHttpServer*(handler: HttpHandler,
                     maxWsMessageBytes: int = 16 * 1024 * 1024,
                     trustedProxyCidrs: seq[string] = @[],
                     trustedForwardedHeaders: bool = false): HttpServer =
+  ## Create a new HTTP server.
   let config = HttpServerConfig(
     host: host,
     port: port,
@@ -351,6 +358,7 @@ proc newHttpServer*(handler: HttpHandler,
   )
 
 proc getPort*(server: HttpServer): int =
+  ## Return the effective server port.
   server.boundPort
 
 proc bindAndListen*(server: HttpServer) =
@@ -372,6 +380,7 @@ proc bindAndListen*(server: HttpServer) =
     server.boundPort = server.config.port
 
 proc stop*(server: HttpServer) =
+  ## Stop types and wake any pending work.
   server.running = false
 
 proc onStart*(server: HttpServer, cb: proc()) =

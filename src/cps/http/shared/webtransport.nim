@@ -68,8 +68,10 @@ proc acceptWebTransportSession*(sessionId: uint64,
                                 authority: string,
                                 path: string,
                                 origin: string = ""): WebTransportSession =
+  ## Accept a WebTransport CONNECT request as a new session.
   initSession(sessionId, authority, path, isClient = false, origin = origin)
 
+## Open web transport session and initialize its protocol state.
 proc openWebTransportSession*(sessionId: uint64 = 0'u64,
                               authority: string,
                               path: string,
@@ -80,6 +82,7 @@ proc buildWebTransportConnectHeaders*(authority: string,
                                       path: string,
                                       origin: string = "",
                                       draftVersion: string = WebTransportDraftVersion): seq[QpackHeaderField] =
+  ## Build web transport connect headers from the supplied state.
   result = @[
     (":method", "CONNECT"),
     (":scheme", "https"),
@@ -93,6 +96,7 @@ proc buildWebTransportConnectHeaders*(authority: string,
     result.add ("sec-webtransport-http3-draft", draftVersion)
 
 proc parseWebTransportConnectHeaders*(headers: openArray[QpackHeaderField]): WebTransportConnectRequest =
+  ## Parse web transport connect headers from its encoded representation.
   result = WebTransportConnectRequest(
     authority: "",
     path: "",
@@ -122,18 +126,21 @@ proc parseWebTransportConnectHeaders*(headers: openArray[QpackHeaderField]): Web
       discard
 
 proc isWebTransportConnectRequest*(headers: openArray[QpackHeaderField]): bool =
+  ## Return whether the headers describe a WebTransport CONNECT request.
   let req = parseWebTransportConnectHeaders(headers)
   req.httpMethod == "CONNECT" and req.protocol.toLowerAscii == WebTransportProtocolToken and
     req.authority.len > 0 and req.path.len > 0
 
 proc encodeWebTransportDatagram*(sessionId: uint64,
                                  payload: openArray[byte]): seq[byte] =
+  ## Encode web transport datagram into its wire representation.
   result = @[]
   result.appendQuicVarInt(sessionId)
   if payload.len > 0:
     result.add payload
 
 proc decodeWebTransportDatagram*(payload: openArray[byte]): tuple[sessionId: uint64, data: seq[byte]] =
+  ## Decode web transport datagram from its wire representation.
   var off = 0
   result.sessionId = decodeQuicVarInt(payload, off)
   if off < payload.len:
@@ -142,6 +149,7 @@ proc decodeWebTransportDatagram*(payload: openArray[byte]): tuple[sessionId: uin
     result.data = @[]
 
 proc openBidiStream*(session: WebTransportSession): uint64 =
+  ## Open bidi stream and initialize its protocol state.
   if session.isNil or session.closed:
     raise newException(ValueError, "WebTransport session is closed")
   if session.nextBidiStreamId > WebTransportMaxStreamId:
@@ -156,6 +164,7 @@ proc openBidiStream*(session: WebTransportSession): uint64 =
     session.nextBidiStreamId += WebTransportStreamIdIncrement
 
 proc openUniStream*(session: WebTransportSession): uint64 =
+  ## Open uni stream and initialize its protocol state.
   if session.isNil or session.closed:
     raise newException(ValueError, "WebTransport session is closed")
   if session.nextUniStreamId > WebTransportMaxStreamId:
@@ -170,6 +179,7 @@ proc openUniStream*(session: WebTransportSession): uint64 =
     session.nextUniStreamId += WebTransportStreamIdIncrement
 
 proc sendDatagram*(session: WebTransportSession, payload: openArray[byte]) =
+  ## Send datagram through the active transport.
   if session.isNil or session.closed:
     raise newException(ValueError, "WebTransport session is closed")
   if payload.len == 0:
@@ -177,12 +187,14 @@ proc sendDatagram*(session: WebTransportSession, payload: openArray[byte]) =
   session.outgoingDatagrams.add @payload
 
 proc popOutgoingDatagrams*(session: WebTransportSession): seq[seq[byte]] =
+  ## Drain the WebTransport datagrams waiting for transmission.
   if session.isNil:
     return @[]
   result = session.outgoingDatagrams
   session.outgoingDatagrams = @[]
 
 proc recvDatagram*(session: WebTransportSession): seq[byte] =
+  ## Receive datagram from the active transport.
   if session.isNil or session.incomingDatagrams.len == 0:
     return @[]
   result = session.incomingDatagrams[0]
@@ -208,6 +220,7 @@ proc enforceIncomingDatagramLimits(session: WebTransportSession) =
       session.incomingDatagramBytes = max(0, session.incomingDatagramBytes - dropped)
 
 proc ingestDatagram*(session: WebTransportSession, payload: openArray[byte]) =
+  ## Parse and queue an incoming protocol datagram.
   if session.isNil or session.closed or payload.len == 0:
     return
   if session.maxIncomingDatagramBytes > 0 and payload.len > session.maxIncomingDatagramBytes:
@@ -216,6 +229,7 @@ proc ingestDatagram*(session: WebTransportSession, payload: openArray[byte]) =
   session.incomingDatagramBytes += payload.len
   session.enforceIncomingDatagramLimits()
 
+## Close session and release its owned resources.
 proc closeSession*(session: WebTransportSession,
                    errorCode: uint32 = 0'u32,
                    reason: string = "") =
@@ -226,11 +240,13 @@ proc closeSession*(session: WebTransportSession,
   session.closeReason = reason
 
 proc queuedIncomingDatagrams*(session: WebTransportSession): int =
+  ## Return the number of queued incoming datagrams.
   if session.isNil:
     return 0
   session.incomingDatagrams.len
 
 proc queuedIncomingDatagramBytes*(session: WebTransportSession): int =
+  ## Return the bytes held by queued incoming datagrams.
   if session.isNil:
     return 0
   session.incomingDatagramBytes

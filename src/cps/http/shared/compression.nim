@@ -33,6 +33,7 @@ type
 # ============================================================
 
 proc gzipCompress*(data: string, level: CompressionLevel = clDefault): string =
+  ## Compress bytes with gzip.
   let zLevel = case level
     of clFast: zippy.BestSpeed
     of clDefault: zippy.DefaultCompression
@@ -43,6 +44,7 @@ proc gzipCompress*(data: string, level: CompressionLevel = clDefault): string =
     raise newException(CompressionError, "gzip compress failed: " & e.msg)
 
 proc gzipDecompress*(data: string): string =
+  ## Decompress a gzip payload.
   try:
     result = zippy.uncompress(data, dfGzip)
   except ZippyError as e:
@@ -60,6 +62,7 @@ proc deflateCompress*(data: string, level: CompressionLevel = clDefault): string
     raise newException(CompressionError, "deflate compress failed: " & e.msg)
 
 proc deflateDecompress*(data: string): string =
+  ## Decompress a zlib-wrapped DEFLATE payload.
   try:
     result = zippy.uncompress(data, dfZlib)
   except ZippyError as e:
@@ -198,6 +201,7 @@ proc finish*(c: ZlibCompressor): string =
   result = outBuf
 
 proc destroy*(c: ZlibCompressor) =
+  ## Release resources owned by compression.
   if c.initialized:
     discard deflateEnd(addr c.strm)
     c.initialized = false
@@ -253,6 +257,7 @@ proc decompressChunk*(d: ZlibDecompressor, data: string): string =
   result = output
 
 proc destroy*(d: ZlibDecompressor) =
+  ## Release resources owned by compression.
   if d.initialized:
     discard inflateEnd(addr d.strm)
     d.initialized = false
@@ -365,6 +370,7 @@ proc rawDeflateDecompressLimited*(data: string, maxOutputBytes: int = -1): strin
   result = output
 
 proc rawDeflateDecompress*(data: string): string =
+  ## Decompress a raw DEFLATE payload.
   rawDeflateDecompressLimited(data, -1)
 
 # ============================================================
@@ -396,6 +402,7 @@ when defined(useZstd):
     {.importc, header: "<zstd.h>".}
 
   proc zstdCompress*(data: string, level: CompressionLevel = clDefault): string =
+    ## Compress bytes with Zstandard.
     let zLevel: cint = case level
       of clFast: 1
       of clDefault: 3
@@ -409,6 +416,7 @@ when defined(useZstd):
     result.setLen(rc.int)
 
   proc zstdDecompress*(data: string): string =
+    ## Decompress a Zstandard payload.
     let frameSize = ZSTD_getFrameContentSize(unsafeAddr data[0], csize_t(data.len))
     const ZSTD_CONTENTSIZE_ERROR = high(culonglong)
     const ZSTD_CONTENTSIZE_UNKNOWN = high(culonglong) - 1
@@ -442,6 +450,7 @@ when defined(useBrotli):
     {.importc, header: "<brotli/decode.h>".}
 
   proc brotliCompress*(data: string, level: CompressionLevel = clDefault): string =
+    ## Compress bytes with Brotli.
     let quality: cint = case level
       of clFast: 1
       of clDefault: 6
@@ -459,6 +468,7 @@ when defined(useBrotli):
     result.setLen(outSize.int)
 
   proc brotliDecompress*(data: string): string =
+    ## Decompress a Brotli payload.
     var outSize = csize_t(data.len * 4 + 1024)
     result = newString(outSize.int)
     let rc = BrotliDecoderDecompress(csize_t(data.len),
@@ -475,6 +485,7 @@ when defined(useBrotli):
 
 proc compress*(data: string, encoding: ContentEncoding,
                level: CompressionLevel = clDefault): string =
+  ## Compress bytes with the selected content encoding.
   case encoding
   of ceGzip: gzipCompress(data, level)
   of ceDeflate: deflateCompress(data, level)
@@ -491,6 +502,7 @@ proc compress*(data: string, encoding: ContentEncoding,
       raise newException(CompressionError, "brotli not compiled in (use -d:useBrotli)")
 
 proc decompress*(data: string, encoding: ContentEncoding): string =
+  ## Decompress bytes with the selected content encoding.
   case encoding
   of ceGzip: gzipDecompress(data)
   of ceDeflate: deflateDecompress(data)
@@ -511,6 +523,7 @@ proc decompress*(data: string, encoding: ContentEncoding): string =
 # ============================================================
 
 proc parseContentEncoding*(header: string): ContentEncoding =
+  ## Parse content encoding from its encoded representation.
   let h = header.strip().toLowerAscii
   case h
   of "gzip", "x-gzip": ceGzip
@@ -594,6 +607,7 @@ proc buildAcceptEncoding*(): string =
   result = parts.join(", ")
 
 proc encodingName*(enc: ContentEncoding): string =
+  ## Return the HTTP token for a content encoding.
   case enc
   of ceGzip: "gzip"
   of ceDeflate: "deflate"
