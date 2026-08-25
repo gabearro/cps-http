@@ -36,7 +36,7 @@ WebTransport, and connection state.
 ## Install
 
 ```sh
-nimble install https://github.com/gabearro/cps-http@#v1.0.0
+nimble install https://github.com/gabearro/cps-http@#v1.0.1
 ```
 
 ## HTTPS client
