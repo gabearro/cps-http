@@ -3,7 +3,7 @@
 ## Verifies that the HTTP server works correctly on the MT runtime
 ## with work-stealing scheduler and blocking pool.
 ##
-## NOTE: Must be compiled with --mm:atomicArc
+## Compile with --mm:arc, --mm:orc, or --mm:atomicArc.
 
 import std/[strutils, nativesockets, osproc, os]
 from std/posix import Sockaddr_in, SockLen

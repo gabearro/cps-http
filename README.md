@@ -36,7 +36,7 @@ WebTransport, and connection state.
 ## Install
 
 ```sh
-nimble install https://github.com/gabearro/cps-http@#v1.0.1
+nimble install https://github.com/gabearro/cps-http@#v1.0.2
 ```
 
 ## HTTPS client
@@ -167,7 +167,11 @@ nimble install -d -y
 nimble checkDocs
 nimble docs
 nimble test
+nimble testMms
 ```
+
+The library supports ARC, ORC, and AtomicARC. `nimble testMms` runs the
+same supported surface under all three memory managers.
 
 `nimble docs` writes the generated API reference to
 [`docs/api/theindex.html`](docs/api/theindex.html).

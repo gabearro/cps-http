@@ -1,0 +1,36 @@
+# syntax=docker/dockerfile:1.7
+FROM nimlang/nim:2.2 AS build
+
+WORKDIR /usr/src/app
+ENV NIM_ENV=production \
+    NIMBLE_DIR=/home/nim/.nimble \
+    PATH=$PATH:/home/nim/.nimble/bin:/root/.nimble/bin
+
+RUN nimble install -y checksums zippy
+
+COPY --from=cps_runtime / /deps/cps-runtime
+COPY --from=cps_tls / /deps/cps-tls
+COPY --from=cps_quic / /deps/cps-quic
+COPY --from=cps_http / /deps/cps-http
+ARG BENCH_SERVER=benchmarks/bench_http_cps_mt_server.nim
+ARG NIM_MM=atomicArc
+ARG NIM_FLAGS=""
+ARG NIM_MODE_FLAGS="-d:danger --assertions:off --warnings:off --hints:off -d:release --opt:speed"
+COPY ${BENCH_SERVER} server.nim
+
+RUN nim c --mm:${NIM_MM} ${NIM_FLAGS} ${NIM_MODE_FLAGS} \
+    --passC:-march=native --passC:-mtune=native \
+    --passC:-flto --passL:-flto \
+    --path:/deps/cps-runtime/src --path:/deps/cps-tls/src \
+    --path:/deps/cps-quic/src --path:/deps/cps-http/src server.nim
+
+FROM debian:trixie-slim
+WORKDIR /usr/src/app
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get -qq update && \
+    apt-get -qy install --no-install-recommends \
+      libssl-dev libpcre2-dev curl && \
+    rm -rf /var/lib/apt/lists/*
+COPY --from=build /usr/src/app/server /usr/src/app/server
+HEALTHCHECK CMD curl --fail http://0.0.0.0:3000 || exit 1
+ENTRYPOINT ["/usr/src/app/server"]
