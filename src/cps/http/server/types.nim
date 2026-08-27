@@ -89,6 +89,7 @@ type
     running*: bool
     boundPort*: int
     connGroup*: TaskGroup
+    acceptStopSignal*: CpsVoidFuture
     shutdownStarted*: bool
     onStartCallbacks*: seq[proc()]
     onShutdownCallbacks*: seq[proc()]
@@ -365,6 +366,7 @@ proc newHttpServer*(handler: HttpHandler,
     running: false,
     boundPort: 0,
     connGroup: newTaskGroup(epCollectAll),
+    acceptStopSignal: nil,
     shutdownStarted: false
   )
 
@@ -391,8 +393,12 @@ proc bindAndListen*(server: HttpServer) =
     server.boundPort = server.config.port
 
 proc stop*(server: HttpServer) =
-  ## Stop types and wake any pending work.
+  ## Stop accepting and wake the server lifecycle task.
   server.running = false
+  if server.listener != nil and not server.listener.closed:
+    server.listener.close()
+  if server.acceptStopSignal != nil and not server.acceptStopSignal.finished:
+    server.acceptStopSignal.complete()
 
 proc onStart*(server: HttpServer, cb: proc()) =
   ## Register a callback invoked once when the server starts accepting.

@@ -9,17 +9,8 @@
 import std/os
 import cps/runtime
 import cps/mt
-import cps/eventloop
-import cps/io/tcp
-import cps/io/streams
 import cps/http/server/dsl
-import cps/http/server/http1
-
-proc startAccepting(listener: TcpListener, handler: HttpHandler) =
-  let config = HttpServerConfig()
-  listener.acceptEach(proc(client: TcpStream) =
-    discard handleHttp1Connection(client.AsyncStream, config, handler)
-  )
+import cps/http/server/server
 
 proc startShard(shardId: int) {.gcsafe.} =
   {.cast(gcsafe).}:
@@ -33,9 +24,16 @@ proc startShard(shardId: int) {.gcsafe.} =
       post "/user":
         respond 200
 
-    let listener = tcpListen("0.0.0.0", 3000, reusePort = true,
-                             deferAcceptSeconds = 1, noDelay = true)
-    startAccepting(listener, handler)
+    let server = newHttpServer(
+      handler,
+      host = "0.0.0.0",
+      port = 3000,
+      enableHttp2 = false,
+      reusePort = true,
+      tcpNoDelay = true
+    )
+    server.bindAndListen()
+    discard server.start()
 
 proc main() =
   let runtime = newMultiThreadRuntime()

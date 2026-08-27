@@ -38,23 +38,31 @@ proc remoteIp(client: TcpStream): string =
 
 proc handleAcceptedConnection(server: HttpServer, client: TcpStream,
                               tlsCtx: tls_server.TlsServerContext): CpsVoidFuture {.cps.} =
-  let handler = server.handler
-  let config = server.config
   let peerIp = remoteIp(client)
-  if config.useTls:
+  if server.config.useTls:
     let tlsStream = await tls_server.tlsAccept(tlsCtx, client)
-    if config.enableHttp2 and tlsStream.alpnProto == "h2":
+    if server.config.enableHttp2 and tlsStream.alpnProto == "h2":
       await handleHttp2Connection(
         tlsStream.AsyncStream,
-        config,
-        handler,
+        server.config,
+        server.handler,
         peerIp,
         addr server.shutdownStarted
       )
     else:
-      await handleHttp1Connection(tlsStream.AsyncStream, config, handler, peerIp)
+      await handleHttp1Connection(
+        tlsStream.AsyncStream,
+        server.config,
+        server.handler,
+        peerIp
+      )
   else:
-    await handleHttp1Connection(client.AsyncStream, config, handler, peerIp)
+    await handleHttp1Connection(
+      client.AsyncStream,
+      server.config,
+      server.handler,
+      peerIp
+    )
 
 proc connRefKey(conn: quic_connection.QuicConnection): pointer {.inline.} =
   ## Connection refs are stable for their lifetime and the close callback
@@ -535,28 +543,27 @@ proc start*(server: HttpServer): CpsVoidFuture {.cps.} =
     quicEp.start()
 
   server.running = true
+  server.acceptStopSignal = newCpsVoidFuture()
   for cb in server.onStartCallbacks:
     cb()
   try:
-    while server.running:
-      var client: TcpStream
-      var acceptFailed = false
-      try:
-        client = await server.listener.accept()
-      except CatchableError:
-        acceptFailed = true
-      if acceptFailed:
-        if server.running:
-          continue
-        else:
-          break
-
+    server.listener.acceptEach(proc(client: TcpStream) =
+      if not server.running:
+        client.closeImmediately()
+        return
       # Apply a hard cap on concurrent active connections.
       if server.config.maxConnections > 0 and server.connGroup.activeCount >= server.config.maxConnections:
-        client.close()
-        continue
+        client.closeImmediately()
+        return
 
       server.connGroup.spawn(handleAcceptedConnection(server, client, tlsCtx))
+    , proc(err: ref CatchableError) =
+      if server.running:
+        server.running = false
+        if not server.acceptStopSignal.finished:
+          server.acceptStopSignal.fail(err)
+    )
+    await server.acceptStopSignal
   finally:
     if quicEp != nil:
       quicEp.shutdown(closeSocket = true)
@@ -571,12 +578,9 @@ proc shutdown*(server: HttpServer, drainTimeoutMs: int = 5000): CpsVoidFuture {.
   if server.shutdownStarted:
     return  # Idempotent: already shutting down
   server.shutdownStarted = true
-  server.running = false
+  server.stop()
   for cb in server.onShutdownCallbacks:
     cb()
-  # Close the listener socket to stop accepting new connections
-  if server.listener != nil and not server.listener.closed:
-    server.listener.close()
   # Wait for active connections to drain, with a timeout
   if server.connGroup.activeCount > 0:
     let waitFut = server.connGroup.wait()
