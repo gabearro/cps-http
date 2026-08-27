@@ -502,7 +502,11 @@ proc huffmanDecode*(data: openArray[byte], startOffset: int, length: int): strin
   ## retaining the trie state needed to validate EOS and padding.
   if startOffset < 0 or length < 0 or (startOffset + length) > data.len:
     raise newException(ValueError, "HPACK Huffman decode bounds invalid")
-  result = newStringOfCap((length * 8 + 4) div 5)
+  # Five bits is the shortest code, so this is a strict output upper bound.
+  # Allocate it once and write by index; `add` otherwise calls prepareAdd for
+  # every decoded symbol even though the capacity is already sufficient.
+  result = newString((length * 8 + 4) div 5)
+  var outputLen = 0
   var node = 0
 
   for byteIdx in 0 ..< length:
@@ -513,12 +517,14 @@ proc huffmanDecode*(data: openArray[byte], startOffset: int, length: int): strin
         raise newException(ValueError, "HPACK Huffman code invalid")
       node = int(transition.nextNode)
       if transition.symbol != 0'u16:
-        result.add char(int(transition.symbol) - 1)
+        result[outputLen] = char(int(transition.symbol) - 1)
+        inc outputLen
 
   # RFC7541 section 5.2: trailing bits must be a prefix of EOS (all one
   # bits), and padding longer than seven bits is forbidden.
   if node != 0 and not HuffmanPaddingNodes[node]:
     raise newException(ValueError, "HPACK Huffman padding invalid")
+  result.setLen(outputLen)
 
 proc huffmanEncode*(s: string): seq[byte] =
   ## Encode bytes with the RFC 7541 Appendix B Huffman table.
@@ -595,26 +601,38 @@ proc findInStaticTable(name, value: string): (int, bool) =
         nameOnlyIdx = i
   return (nameOnlyIdx, false)
 
-proc encode*(enc: var HpackEncoder, headers: seq[(string, string)]): seq[byte] =
-  ## Encode hpack into its wire representation.
-  result = @[]
-  for (name, value) in headers:
-    let (staticIdx, exactMatch) = findInStaticTable(name, value)
+proc encodeHeaderInto*(enc: var HpackEncoder, name, value: string,
+                       output: var seq[byte]) =
+  ## Append one HPACK field to a caller-owned output buffer.
+  let (staticIdx, exactMatch) = findInStaticTable(name, value)
 
-    if exactMatch and staticIdx > 0:
-      # Indexed header field (section 6.1)
-      result.add encodeInteger(staticIdx, 7, 0x80)
-    elif staticIdx > 0:
-      # Literal with incremental indexing, indexed name (section 6.2.1)
-      result.add encodeInteger(staticIdx, 6, 0x40)
-      result.add encodeString(value)
-      enc.dynTable.add(name, value)
-    else:
-      # Literal with incremental indexing, new name (section 6.2.1)
-      result.add 0x40.byte
-      result.add encodeString(name)
-      result.add encodeString(value)
-      enc.dynTable.add(name, value)
+  if exactMatch and staticIdx > 0:
+    # Indexed header field (section 6.1)
+    output.add encodeInteger(staticIdx, 7, 0x80)
+  elif staticIdx > 0:
+    # Literal with incremental indexing, indexed name (section 6.2.1)
+    output.add encodeInteger(staticIdx, 6, 0x40)
+    output.add encodeString(value)
+    enc.dynTable.add(name, value)
+  else:
+    # Literal with incremental indexing, new name (section 6.2.1)
+    output.add 0x40.byte
+    output.add encodeString(name)
+    output.add encodeString(value)
+    enc.dynTable.add(name, value)
+
+proc encodeInto*(enc: var HpackEncoder, headers: openArray[(string, string)],
+                 output: var seq[byte]) =
+  ## Encode HPACK into caller-owned storage so persistent connections can
+  ## reuse the output capacity between header blocks.
+  output.setLen(0)
+  for (name, value) in headers:
+    enc.encodeHeaderInto(name, value, output)
+
+proc encode*(enc: var HpackEncoder,
+             headers: seq[(string, string)]): seq[byte] =
+  ## Encode HPACK into a newly owned byte sequence.
+  enc.encodeInto(headers, result)
 
 # ============================================================
 # HPACK Decoder
@@ -624,9 +642,11 @@ proc initHpackDecoder*(maxSize: int = 4096): HpackDecoder =
   ## Initialize hpack decoder.
   HpackDecoder(dynTable: initDynamicTable(maxSize))
 
-proc decode*(dec: var HpackDecoder, data: openArray[byte]): seq[(string, string)] =
-  ## Decode hpack from its wire representation.
-  result = @[]
+proc decodeInto*(dec: var HpackDecoder, data: openArray[byte],
+                 headers: var seq[(string, string)]) =
+  ## Decode HPACK into a caller-owned sequence. Reusing its capacity avoids a
+  ## fresh header-vector allocation for every message on persistent sessions.
+  headers.setLen(0)
   var offset = 0
 
   while offset < data.len:
@@ -636,7 +656,7 @@ proc decode*(dec: var HpackDecoder, data: openArray[byte]): seq[(string, string)
       # Indexed header field (section 6.1)
       let idx = decodeInteger(data, offset, 7)
       let (name, value) = lookup(idx, dec.dynTable)
-      result.add (name, value)
+      headers.add (name, value)
 
     elif (firstByte and 0xC0) == 0x40:
       # Literal with incremental indexing (section 6.2.1)
@@ -648,7 +668,7 @@ proc decode*(dec: var HpackDecoder, data: openArray[byte]): seq[(string, string)
         name = decodeString(data, offset)
       value = decodeString(data, offset)
       dec.dynTable.add(name, value)
-      result.add (name, value)
+      headers.add (name, value)
 
     elif (firstByte and 0xF0) == 0x00:
       # Literal without indexing (section 6.2.2)
@@ -659,7 +679,7 @@ proc decode*(dec: var HpackDecoder, data: openArray[byte]): seq[(string, string)
       else:
         name = decodeString(data, offset)
       value = decodeString(data, offset)
-      result.add (name, value)
+      headers.add (name, value)
 
     elif (firstByte and 0xF0) == 0x10:
       # Literal never indexed (section 6.2.3)
@@ -670,7 +690,7 @@ proc decode*(dec: var HpackDecoder, data: openArray[byte]): seq[(string, string)
       else:
         name = decodeString(data, offset)
       value = decodeString(data, offset)
-      result.add (name, value)
+      headers.add (name, value)
 
     elif (firstByte and 0xE0) == 0x20:
       # Dynamic table size update (section 6.3)
@@ -680,3 +700,8 @@ proc decode*(dec: var HpackDecoder, data: openArray[byte]): seq[(string, string)
 
     else:
       raise newException(ValueError, "Unknown HPACK encoding byte: " & $firstByte)
+
+proc decode*(dec: var HpackDecoder,
+             data: openArray[byte]): seq[(string, string)] =
+  ## Decode HPACK into a newly owned header sequence.
+  dec.decodeInto(data, result)

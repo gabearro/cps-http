@@ -36,7 +36,7 @@ type
 
 const
   H1Empty200KeepAliveResponse =
-    "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: keep-alive\r\n\r\n"
+    "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"
   H1Empty200CloseResponse =
     "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
 
@@ -480,7 +480,9 @@ proc parseRequestResultWithBody(stream: AsyncStream, reader: BufferedReader,
     remoteAddr: remoteAddr,
     stream: stream,
     reader: reader,
-    context: nil
+    context: nil,
+    maxWsFrameBytes: config.maxWsFrameBytes,
+    maxWsMessageBytes: config.maxWsMessageBytes
   )
   return ParseRequestResult(ok: true, req: req,
     hasConnectionClose: hdr.hasConnectionClose,
@@ -522,7 +524,9 @@ proc processHeaderBlockPoll(headerBlock: string, config: HttpServerConfig,
     remoteAddr: remoteAddr,
     stream: stream,
     reader: reader,
-    context: nil
+    context: nil,
+    maxWsFrameBytes: config.maxWsFrameBytes,
+    maxWsMessageBytes: config.maxWsMessageBytes
   )
   parsed[] = ParseRequestResult(ok: true, req: req,
     hasConnectionClose: hdr.hasConnectionClose,
@@ -574,7 +578,32 @@ proc parseRequestResultPoll(stream: AsyncStream, reader: BufferedReader,
         if fillFut.hasError():
           resultFut.complete(ParseRequestResult(closeConn: true))
           return
-        # Now try readUntilHeaderEnd (data should be available or more will come)
+        # The normal readiness path has a complete request after one fill.
+        # Parse it directly instead of constructing completed header/body
+        # futures and another callback layer.
+        let filledEnd = reader.searchHeaderEnd()
+        if filledEnd >= 0:
+          var filledParsed: ParseRequestResult
+          let filledFut = processHeaderBlockPoll(
+            reader.extractHeaderBlock(filledEnd), config, stream, reader,
+            remoteAddr, addr filledParsed)
+          if filledFut.isNil:
+            resultFut.complete(filledParsed)
+          elif filledFut.finished():
+            if filledFut.hasError():
+              resultFut.fail(filledFut.getError())
+            else:
+              resultFut.complete(filledFut.read())
+          else:
+            filledFut.addCallback(proc() =
+              if filledFut.hasError():
+                resultFut.fail(filledFut.getError())
+              else:
+                resultFut.complete(filledFut.read())
+            )
+          return
+
+        # Split headers or unusually large headers retain the general reader.
         let headerFut = applyReadTimeout(reader.readUntilHeaderEnd(maxHeaderSize), config.readTimeoutMs)
         if headerFut.finished():
           if headerFut.hasError():
@@ -754,7 +783,6 @@ proc buildResponseStringImpl(resp: HttpResponseBuilder,
   result = newStringOfCap(256 + bodyStr.len)
   result.add statusLine(resp.statusCode)
 
-  var hasConnection = false
   for (k, v) in resp.headers:
     if eqCaseInsensitive(k, "content-length") or eqCaseInsensitive(k, "transfer-encoding"):
       continue
@@ -762,18 +790,12 @@ proc buildResponseStringImpl(resp: HttpResponseBuilder,
     result.add ": "
     result.add v
     result.add "\r\n"
-    if eqCaseInsensitive(k, "connection"):
-      hasConnection = true
-
   if resetContentNoPayload:
     result.add "Content-Length: 0\r\n"
   elif not noBody:
     result.add "Content-Length: "
     result.addInt(representationLen)
     result.add "\r\n"
-
-  if not hasConnection:
-    result.add "Connection: keep-alive\r\n"
 
   result.add "\r\n"
   result.add bodyStr
@@ -890,7 +912,7 @@ proc handleHttp1Connection*(stream: AsyncStream, config: HttpServerConfig,
           if shouldCloseAfterResponse:
             s.add "\r\nConnection: close\r\n\r\n"
           else:
-            s.add "\r\nConnection: keep-alive\r\n\r\n"
+            s.add "\r\n\r\n"
           s.add resp.body
           await stream.write(s)
       else:

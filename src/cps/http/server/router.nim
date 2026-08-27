@@ -168,6 +168,14 @@ proc validateParamType(decodedPart: string, paramType: string): bool =
   else:
     return false
 
+proc decodeUrlIfNeeded(value: string): string {.inline.} =
+  ## Preserve the caller's string when URL decoding cannot change it. This is
+  ## the common route/query case and avoids allocating an identical copy.
+  for ch in value:
+    if ch == '%' or ch == '+':
+      return decodeUrl(value)
+  value
+
 proc matchRouteWithParts*(segments: seq[PathSegment], parts: seq[string],
                           params: var Table[string, string]): bool =
   ## Match pre-split path parts against route segments. Avoids re-splitting.
@@ -179,7 +187,7 @@ proc matchRouteWithParts*(segments: seq[PathSegment], parts: seq[string],
     if parts.len < segments.len - 1:
       return false
     for i in 0 ..< segments.len - 1:
-      let decodedPart = decodeUrl(parts[i])
+      let decodedPart = decodeUrlIfNeeded(parts[i])
       case segments[i].kind
       of pskLiteral:
         if i >= parts.len or decodedPart != segments[i].value:
@@ -212,7 +220,7 @@ proc matchRouteWithParts*(segments: seq[PathSegment], parts: seq[string],
         break
       else:
         return false
-    let decodedPart = decodeUrl(parts[i])
+    let decodedPart = decodeUrlIfNeeded(parts[i])
     case segments[i].kind
     of pskLiteral:
       if decodedPart != segments[i].value:
@@ -268,11 +276,11 @@ proc parseQueryString*(path: string): Table[string, string] =
       continue
     let eqIdx = pair.find('=')
     if eqIdx >= 0:
-      let key = decodeUrl(pair[0 ..< eqIdx])
-      let val = decodeUrl(pair[eqIdx + 1 .. ^1])
+      let key = decodeUrlIfNeeded(pair[0 ..< eqIdx])
+      let val = decodeUrlIfNeeded(pair[eqIdx + 1 .. ^1])
       result[key] = val
     else:
-      result[decodeUrl(pair)] = ""
+      result[decodeUrlIfNeeded(pair)] = ""
 
 proc parseFormBody*(body: string): Table[string, string] =
   ## Parse URL-encoded form body (application/x-www-form-urlencoded).
@@ -285,11 +293,11 @@ proc parseFormBody*(body: string): Table[string, string] =
       continue
     let eqIdx = pair.find('=')
     if eqIdx >= 0:
-      let key = decodeUrl(pair[0 ..< eqIdx])
-      let val = decodeUrl(pair[eqIdx + 1 .. ^1])
+      let key = decodeUrlIfNeeded(pair[0 ..< eqIdx])
+      let val = decodeUrlIfNeeded(pair[eqIdx + 1 .. ^1])
       result[key] = val
     else:
-      result[decodeUrl(pair)] = ""
+      result[decodeUrlIfNeeded(pair)] = ""
 
 # ============================================================
 # JSON body parsing
@@ -902,7 +910,7 @@ proc matchFastRoute(segments: seq[PathSegment], path: string, pathEnd: int,
         if path[partStart + j] != literal[j]:
           return false
     of pskParam:
-      let decoded = decodeUrl(path[partStart ..< pos])
+      let decoded = decodeUrlIfNeeded(path[partStart ..< pos])
       if not validateParamType(decoded, segment.paramType):
         return false
       if params.len == 0:

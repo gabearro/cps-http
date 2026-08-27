@@ -36,6 +36,8 @@ type
     templateRenderer*: TemplateRenderer  ## Router-scoped template renderer (if configured).
     context*: TableRef[string, string]  ## Shared per-request context across request copies
     appState*: RootRef      ## Typed app state injected by router dispatch
+    maxWsFrameBytes*: int   ## Per-request WebSocket frame limit inherited from the server.
+    maxWsMessageBytes*: int ## Per-request WebSocket message limit inherited from the server.
 
   HttpResponseBuilder* = object
     statusCode*: int
@@ -163,6 +165,15 @@ proc isValidHeaderName*(name: string): bool =
     return false
   for c in name:
     if c notin headerTokenChars:
+      return false
+  true
+
+proc isValidLowercaseHeaderName*(name: string): bool =
+  ## Validate the lowercase token form required on HTTP/2 and HTTP/3 wires.
+  if name.len == 0:
+    return false
+  for c in name:
+    if c notin headerTokenChars or c in {'A' .. 'Z'}:
       return false
   true
 

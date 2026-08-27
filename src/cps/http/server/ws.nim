@@ -13,17 +13,19 @@ import ../shared/http2_stream_adapter
 
 export ws
 
-proc parseWsLimit(req: HttpRequest, key: string, fallback: int): int =
-  if req.context.isNil:
-    return fallback
-  let raw = req.context.getOrDefault(key)
-  if raw.len == 0:
-    return fallback
-  try:
-    let parsed = raw.parseInt()
-    if parsed > 0: parsed else: fallback
-  except ValueError:
-    fallback
+proc parseWsLimit(req: HttpRequest, key: string, configured,
+                  fallback: int): int =
+  ## Explicit request context remains an override, while the normal server
+  ## configuration no longer requires allocating a context table per request.
+  if not req.context.isNil:
+    let raw = req.context.getOrDefault(key)
+    if raw.len > 0:
+      try:
+        let parsed = raw.parseInt()
+        return if parsed > 0: parsed else: fallback
+      except ValueError:
+        return fallback
+  if configured > 0: configured else: fallback
 
 proc headerHasToken(value, token: string): bool =
   let expected = token.toLowerAscii
@@ -64,8 +66,10 @@ proc acceptWebSocket*(stream: AsyncStream, reader: BufferedReader,
   ## Validate the WebSocket upgrade request and send the appropriate response.
   ## Supports both HTTP/1.1 (101 Switching Protocols) and HTTP/2 (Extended CONNECT, RFC 8441).
   let fut = newCpsFuture[WebSocket]()
-  let maxFrameBytes = parseWsLimit(req, "ws_max_frame_bytes", 1024 * 1024)
-  let maxMessageBytes = parseWsLimit(req, "ws_max_message_bytes", 16 * 1024 * 1024)
+  let maxFrameBytes = parseWsLimit(
+    req, "ws_max_frame_bytes", req.maxWsFrameBytes, 1024 * 1024)
+  let maxMessageBytes = parseWsLimit(
+    req, "ws_max_message_bytes", req.maxWsMessageBytes, 16 * 1024 * 1024)
 
   for (k, v) in extraHeaders:
     if not validateHeaderPair(k, v):
@@ -101,7 +105,9 @@ proc acceptWebSocket*(stream: AsyncStream, reader: BufferedReader,
       h2Headers.add (k.toLowerAscii, v)
     let writeFut = adapter.sendResponseHeaders(200, h2Headers)
     let capturedStream = stream
-    let capturedReader = reader
+    let capturedReader =
+      if reader.isNil: newBufferedReader(stream)
+      else: reader
     let capturedExtParsed = extParsed
     writeFut.addCallback(proc() =
       if writeFut.hasError():

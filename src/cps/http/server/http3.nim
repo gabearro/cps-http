@@ -56,7 +56,27 @@ proc newHttp3ServerSession*(connId: seq[byte],
   )
 
 proc statusPseudoHeader(statusCode: int): QpackHeaderField =
-  (":status", $statusCode)
+  # Reuse the values carried by RFC 9204's static table. Besides avoiding a
+  # short-lived allocation for the common statuses, this lets the encoder
+  # compare the exact shared strings it will emit as indexed fields.
+  let value =
+    case statusCode
+    of 100: "100"
+    of 103: "103"
+    of 200: "200"
+    of 204: "204"
+    of 206: "206"
+    of 302: "302"
+    of 304: "304"
+    of 400: "400"
+    of 403: "403"
+    of 404: "404"
+    of 421: "421"
+    of 425: "425"
+    of 500: "500"
+    of 503: "503"
+    else: $statusCode
+  (":status", value)
 
 proc validatePseudoHeaders(headers: seq[QpackHeaderField]) =
   proc parseContentLengthValue(value: string): uint64 =
@@ -125,15 +145,15 @@ proc validatePseudoHeaders(headers: seq[QpackHeaderField]) =
         raiseProtocolViolation(H3ErrMessageError, "HTTP/3 request contains unsupported pseudo-header: " & k)
     else:
       seenRegularHeader = true
-      if k != k.toLowerAscii:
-        raiseProtocolViolation(H3ErrMessageError, "HTTP/3 request header names must be lowercase")
-      if not isValidHeaderName(k) or not isValidHeaderValue(v):
+      if not isValidLowercaseHeaderName(k):
+        raiseProtocolViolation(H3ErrMessageError, "HTTP/3 request header names must be lowercase tokens")
+      if not isValidHeaderValue(v):
         raiseProtocolViolation(H3ErrMessageError, "HTTP/3 request contains invalid header field")
       case k
       of "connection", "proxy-connection", "keep-alive", "upgrade", "transfer-encoding":
         raiseProtocolViolation(H3ErrMessageError, "HTTP/3 request contains forbidden connection-specific header: " & k)
       of "te":
-        if v.toLowerAscii != "trailers":
+        if not eqCaseInsensitive(v, "trailers"):
           raiseProtocolViolation(H3ErrMessageError, "HTTP/3 request TE header must be \"trailers\"")
       of "host":
         if sawHostHeader:
@@ -169,7 +189,7 @@ proc validatePseudoHeaders(headers: seq[QpackHeaderField]) =
     raiseProtocolViolation(H3ErrMessageError, "HTTP/3 request has empty :protocol pseudo-header")
   if hasProtocol and not isValidHeaderName(protocolValue):
     raiseProtocolViolation(H3ErrMessageError, "HTTP/3 request has invalid :protocol pseudo-header token")
-  if hasAuthority and sawHostHeader and authorityValue.toLowerAscii != hostValue.toLowerAscii:
+  if hasAuthority and sawHostHeader and not eqCaseInsensitive(authorityValue, hostValue):
     raiseProtocolViolation(H3ErrMessageError, "HTTP/3 request host header must match :authority pseudo-header")
   if not hasMethod:
     raiseProtocolViolation(H3ErrMessageError, "HTTP/3 request missing required :method pseudo-header")
@@ -230,10 +250,9 @@ proc validateResponseStatusCode(statusCode: int) =
 proc validateResponseHeader(name: string, value: string) =
   if name.len == 0:
     raiseProtocolViolation(H3ErrMessageError, "HTTP/3 response contains empty header name")
-  let lower = name.toLowerAscii
-  if name != lower:
-    raiseProtocolViolation(H3ErrMessageError, "HTTP/3 response header names must be lowercase")
-  if not isValidHeaderName(name) or not isValidHeaderValue(value):
+  if not isValidLowercaseHeaderName(name):
+    raiseProtocolViolation(H3ErrMessageError, "HTTP/3 response header names must be lowercase tokens")
+  if not isValidHeaderValue(value):
     raiseProtocolViolation(H3ErrMessageError, "HTTP/3 response contains invalid header field")
   case name
   of "connection", "proxy-connection", "keep-alive", "upgrade", "transfer-encoding", "te":
@@ -329,7 +348,8 @@ proc buildRequest(streamId: uint64, headers: seq[QpackHeaderField], body: string
 
 proc buildResponseFrames(session: Http3ServerSession, resp: HttpResponseBuilder): seq[byte] =
   validateResponseStatusCode(resp.statusCode)
-  var headers: seq[QpackHeaderField] = @[statusPseudoHeader(resp.statusCode)]
+  var headers = newSeqOfCap[QpackHeaderField](resp.headers.len + 1)
+  headers.add statusPseudoHeader(resp.statusCode)
   for (k, v) in resp.headers:
     validateResponseHeader(k, v)
     headers.add (k, v)
@@ -340,8 +360,10 @@ proc buildResponseFrames(session: Http3ServerSession, resp: HttpResponseBuilder)
       H3ErrExcessiveLoad,
       "HTTP/3 response headers exceed peer SETTINGS_MAX_FIELD_SECTION_SIZE"
     )
-  result = @[]
-  result.add session.conn.encodeHeadersFrame(headers)
+  # The encoded HEADERS frame already owns exactly the byte sequence we need.
+  # Move it into the result instead of allocating an empty sequence and copying
+  # the frame through `add`; a DATA frame can extend that same buffer if needed.
+  result = session.conn.encodeHeadersFrame(headers)
   if resp.body.len > 0:
     result.add encodeDataFrame(resp.body.toOpenArrayByte(0, resp.body.high))
 

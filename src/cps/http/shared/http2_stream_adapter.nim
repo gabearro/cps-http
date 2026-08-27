@@ -30,6 +30,7 @@ type
     closeWriteProc*: AdapterCloseWriteProc
     responseHeadersSent*: bool
     responseHeadersFuture: CpsVoidFuture
+    writeTail: CpsVoidFuture
     readBuffer: string
     readWaiters: seq[AdapterWaiter]
     eofSignaled: bool
@@ -90,11 +91,24 @@ proc ensureAutoResponseHeaders(a: Http2StreamAdapter): CpsVoidFuture {.cps.} =
 proc adapterWrite(s: AsyncStream, data: string): CpsVoidFuture {.cps.} =
   ## Write stream data through the connection writer callback.
   let a = Http2StreamAdapter(s)
+  let predecessor = a.writeTail
+  let turn = newCpsVoidFuture()
+  a.writeTail = turn
   if a.sendDataProc == nil:
-    raise newException(system.IOError, "HTTP/2 adapter has no sendData callback")
-  if not a.responseHeadersSent:
-    await a.ensureAutoResponseHeaders()
-  await a.sendDataProc(a.streamId, data)
+    let err = newException(system.IOError, "HTTP/2 adapter has no sendData callback")
+    turn.fail(err)
+    raise err
+  try:
+    if not predecessor.isNil:
+      await predecessor
+    if not a.responseHeadersSent:
+      await a.ensureAutoResponseHeaders()
+    await a.sendDataProc(a.streamId, data)
+    turn.complete()
+  except CatchableError as err:
+    if not turn.finished:
+      turn.fail(err)
+    raise
 
 proc adapterClose(s: AsyncStream) =
   let a = Http2StreamAdapter(s)
@@ -115,6 +129,7 @@ proc newHttp2StreamAdapter*(streamId: uint32,
     closeWriteProc: closeWriteProc,
     responseHeadersSent: false,
     responseHeadersFuture: nil,
+    writeTail: nil,
     readBuffer: "",
     readWaiters: @[],
     eofSignaled: false

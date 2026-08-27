@@ -375,6 +375,12 @@ proc drainQpackDecoderStreamData*(conn: Http3Connection): seq[byte] =
   result = conn.pendingQpackDecoderStreamData
   conn.pendingQpackDecoderStreamData = @[]
 
+proc hasPendingQpackStreamData*(conn: Http3Connection): bool {.inline.} =
+  ## Return whether either local QPACK control stream has bytes to transmit.
+  ## Callers can use this before entering an asynchronous flush path.
+  not conn.isNil and (conn.pendingQpackEncoderStreamData.len > 0 or
+    conn.pendingQpackDecoderStreamData.len > 0)
+
 proc encodeHeadersFrame*(conn: Http3Connection, headers: openArray[QpackHeaderField]): seq[byte] =
   ## Encode headers frame into its wire representation.
   let headerBlock =
@@ -1204,7 +1210,15 @@ proc processFrame(conn: Http3Connection, streamRole: Http3StreamRole,
       return sectionSizeErr
     conn.queueQpackSectionAck(streamId)
     if streamRole == h3srRequest and not conn.isClient and allowRequestTunnelSideEffects:
-      if isWebTransportConnectRequest(result.headers):
+      # WebTransport and MASQUE are extended CONNECT protocols. Gate their
+      # full parsers so ordinary requests do not allocate temporary request
+      # objects and copy every pseudo-header twice.
+      var isConnect = false
+      for field in result.headers:
+        if field[0] == ":method":
+          isConnect = field[1] == "CONNECT"
+          break
+      if isConnect and isWebTransportConnectRequest(result.headers):
         let req = parseWebTransportConnectHeaders(result.headers)
         if streamId notin conn.webTransportSessions:
           let wtSession =
@@ -1213,7 +1227,7 @@ proc processFrame(conn: Http3Connection, streamRole: Http3StreamRole,
             else:
               acceptWebTransportSession(sessionId = streamId, authority = req.authority, path = req.path, origin = req.origin)
           conn.webTransportSessions[streamId] = wtSession
-      elif isMasqueConnectRequest(result.headers):
+      elif isConnect and isMasqueConnectRequest(result.headers):
         let req = parseMasqueConnectRequest(result.headers)
         if streamId notin conn.masqueSessions:
           let mSession =

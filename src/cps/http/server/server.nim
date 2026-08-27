@@ -8,7 +8,7 @@ import cps/eventloop
 when defined(posix):
   import cps/concurrency/signals
 import cps/concurrency/taskgroup
-import std/[nativesockets, tables, strutils, os, net]
+import std/[nativesockets, tables, os, net]
 import cps/io/streams
 import cps/io/tcp
 import cps/tls/server as tls_server
@@ -28,17 +28,13 @@ import ../shared/masque as masque_shared
 export types
 
 type H3SessionStore = ref object
-  sessions: Table[string, http3_server.Http3ServerSession]
-  initialized: Table[string, bool]
+  sessions: Table[pointer, http3_server.Http3ServerSession]
+  initialized: Table[pointer, bool]
   quicEndpointPtr: pointer
 
 proc remoteIp(client: TcpStream): string =
   ## Best-effort remote peer extraction for trusted proxy decisions.
-  try:
-    let (ip, _) = getPeerAddr(client.fd, AF_INET)
-    return ip
-  except CatchableError:
-    return ""
+  client.peerEndpoint().ip
 
 proc handleAcceptedConnection(server: HttpServer, client: TcpStream,
                               tlsCtx: tls_server.TlsServerContext): CpsVoidFuture {.cps.} =
@@ -60,15 +56,15 @@ proc handleAcceptedConnection(server: HttpServer, client: TcpStream,
   else:
     await handleHttp1Connection(client.AsyncStream, config, handler, peerIp)
 
-proc connIdKey(conn: quic_connection.QuicConnection): string =
-  result = newStringOfCap(conn.localConnId.len * 2)
-  for b in conn.localConnId:
-    result.add toHex(int(b), 2).toLowerAscii
+proc connRefKey(conn: quic_connection.QuicConnection): pointer {.inline.} =
+  ## Connection refs are stable for their lifetime and the close callback
+  ## removes their session before ARC/ORC can reuse the address.
+  cast[pointer](conn)
 
 proc newH3SessionStore(): H3SessionStore =
   new(result)
-  result.sessions = initTable[string, http3_server.Http3ServerSession]()
-  result.initialized = initTable[string, bool]()
+  result.sessions = initTable[pointer, http3_server.Http3ServerSession]()
+  result.initialized = initTable[pointer, bool]()
   result.quicEndpointPtr = nil
 
 proc setH3SessionStoreEndpoint(store: H3SessionStore,
@@ -87,7 +83,7 @@ proc getOrCreateH3Session(store: H3SessionStore,
                           handler: HttpHandler,
                           maxRequestBodySize: int,
                           enableDatagram: bool): http3_server.Http3ServerSession =
-  let key = connIdKey(conn)
+  let key = connRefKey(conn)
   if key notin store.sessions:
     store.sessions[key] = http3_server.newHttp3ServerSession(
       conn.localConnId,
@@ -99,7 +95,7 @@ proc getOrCreateH3Session(store: H3SessionStore,
 
 proc removeH3Session(store: H3SessionStore,
                      conn: quic_connection.QuicConnection) =
-  let key = connIdKey(conn)
+  let key = connRefKey(conn)
   if key in store.sessions:
     store.sessions.del(key)
   if key in store.initialized:
@@ -252,6 +248,13 @@ proc flushHttp3ApplicationQueues(ep: quic_endpoint.QuicEndpoint,
         fin = false
       )
 
+proc hasHttp3ApplicationQueues(session: http3_server.Http3ServerSession): bool
+    {.inline.} =
+  ## Avoid constructing an asynchronous flush future for ordinary HTTP/3
+  ## sessions that have never enabled WebTransport or MASQUE.
+  not session.isNil and (session.conn.webTransportSessions.len > 0 or
+    session.conn.masqueSessions.len > 0)
+
 proc handleQuicHttp3Stream(ep: quic_endpoint.QuicEndpoint,
                            sessions: H3SessionStore,
                            handler: HttpHandler,
@@ -274,7 +277,8 @@ proc handleQuicHttp3Stream(ep: quic_endpoint.QuicEndpoint,
 
   if not quic_streams.isBidirectionalStream(streamId):
     if reqBytes.len == 0 and not streamEnded:
-      await flushHttp3ApplicationQueues(ep, conn, session)
+      if session.hasHttp3ApplicationQueues():
+        await flushHttp3ApplicationQueues(ep, conn, session)
       return
     var events: seq[Http3Event] = @[]
     try:
@@ -300,7 +304,8 @@ proc handleQuicHttp3Stream(ep: quic_endpoint.QuicEndpoint,
           if ev.errorCode != 0'u64: ev.errorCode else: H3ErrGeneralProtocol
         )
         return
-    await flushHttp3QpackControlStreams(ep, conn, session)
+    if session.conn.hasPendingQpackStreamData():
+      await flushHttp3QpackControlStreams(ep, conn, session)
     let blockedIds = session.qpackBlockedRequestStreamIds()
     if blockedIds.len > 0:
       for pendingStreamId in blockedIds:
@@ -335,15 +340,19 @@ proc handleQuicHttp3Stream(ep: quic_endpoint.QuicEndpoint,
         if retryFrames.len > 0:
           if conn.state != quic_connection.qcsActive or not conn.canEncodePacketType(quic_types.qptShort):
             return
-          await flushHttp3QpackControlStreams(ep, conn, session)
+          if session.conn.hasPendingQpackStreamData():
+            await flushHttp3QpackControlStreams(ep, conn, session)
           let retryFin = not session.hasPendingRequestStream(pendingStreamId)
           await ep.sendStreamData(conn, pendingStreamId, retryFrames, fin = retryFin)
-    await flushHttp3ApplicationQueues(ep, conn, session)
-    await closeHttp3GracefullyIfReady(ep, conn, session)
+    if session.hasHttp3ApplicationQueues():
+      await flushHttp3ApplicationQueues(ep, conn, session)
+    if session.conn.hasPeerGoaway:
+      await closeHttp3GracefullyIfReady(ep, conn, session)
     return
 
   if reqBytes.len == 0 and not streamEnded:
-    await flushHttp3ApplicationQueues(ep, conn, session)
+    if session.hasHttp3ApplicationQueues():
+      await flushHttp3ApplicationQueues(ep, conn, session)
     return
   var respFrames: seq[byte] = @[]
   try:
@@ -371,11 +380,14 @@ proc handleQuicHttp3Stream(ep: quic_endpoint.QuicEndpoint,
   if respFrames.len > 0:
     if conn.state != quic_connection.qcsActive or not conn.canEncodePacketType(quic_types.qptShort):
       return
-    await flushHttp3QpackControlStreams(ep, conn, session)
+    if session.conn.hasPendingQpackStreamData():
+      await flushHttp3QpackControlStreams(ep, conn, session)
     let responseFin = not session.hasPendingRequestStream(streamId)
     await ep.sendStreamData(conn, streamId, respFrames, fin = responseFin)
-  await flushHttp3ApplicationQueues(ep, conn, session)
-  await closeHttp3GracefullyIfReady(ep, conn, session)
+  if session.hasHttp3ApplicationQueues():
+    await flushHttp3ApplicationQueues(ep, conn, session)
+  if session.conn.hasPeerGoaway:
+    await closeHttp3GracefullyIfReady(ep, conn, session)
 
 proc initializeQuicHttp3Connection(ep: quic_endpoint.QuicEndpoint,
                                    sessions: H3SessionStore,
@@ -386,7 +398,7 @@ proc initializeQuicHttp3Connection(ep: quic_endpoint.QuicEndpoint,
   if conn.isNil or conn.state != quic_connection.qcsActive or
       not conn.canEncodePacketType(quic_types.qptShort):
     return
-  let key = connIdKey(conn)
+  let key = connRefKey(conn)
   if key in sessions.initialized and sessions.initialized[key]:
     return
   let session = getOrCreateH3Session(
@@ -412,7 +424,7 @@ proc handleQuicDatagramEcho(ep: quic_endpoint.QuicEndpoint,
   var consumed = false
   var session: http3_server.Http3ServerSession = nil
   if data.len > 0 and not sessions.isNil:
-    let key = connIdKey(conn)
+    let key = connRefKey(conn)
     if key in sessions.sessions:
       session = sessions.sessions[key]
       if session.conn.canSendH3Datagrams():
@@ -426,7 +438,8 @@ proc handleQuicDatagramEcho(ep: quic_endpoint.QuicEndpoint,
         # Suppress QUIC datagram echo fallback on active HTTP/3 sessions when
         # H3 DATAGRAM has not been negotiated.
         consumed = true
-      await flushHttp3ApplicationQueues(ep, conn, session)
+      if session.hasHttp3ApplicationQueues():
+        await flushHttp3ApplicationQueues(ep, conn, session)
   if not consumed and enabled and data.len > 0:
     await ep.sendDatagram(conn, data)
 
@@ -460,6 +473,7 @@ proc start*(server: HttpServer): CpsVoidFuture {.cps.} =
     quicCfg.quicInitialMaxStreamDataUni = server.config.quicInitialMaxStreamDataUni
     quicCfg.quicInitialMaxStreamsBidi = server.config.quicInitialMaxStreamsBidi
     quicCfg.quicInitialMaxStreamsUni = server.config.quicInitialMaxStreamsUni
+    quicCfg.reusePort = server.config.reusePort
     quicCfg.tlsCertFile = server.config.certFile
     quicCfg.tlsKeyFile = server.config.keyFile
     quicCfg.alpn = @["h3"]

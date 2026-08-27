@@ -49,7 +49,9 @@ type
     reader*: BufferedReader
     encoder*: HpackEncoder
     decoder*: HpackDecoder
+    headerEncodeScratch: seq[byte]
     streams*: Table[uint32, Http2ServerStream]
+    streamPool: seq[Http2ServerStream]
     localWindowSize*: int
     remoteWindowSize*: int
     remoteSettings*: Table[uint16, uint32]
@@ -65,7 +67,9 @@ type
     continuationStreamId*: uint32
     outboundQueue*: Deque[OutboundWrite]
     writerRunning*: bool
-    writerWake*: CpsVoidFuture
+    writerPayload: string
+    writerCompletions: seq[CpsVoidFuture]
+    writerWrite: CpsVoidFuture
     writerError*: ref CatchableError
     connectionWindowWaiters*: seq[CpsVoidFuture]
     shutdownFlag*: ptr bool
@@ -85,10 +89,12 @@ const
   H2ErrCancel = 8'u32
   H2ErrCompressionError = 9'u32
   H2ErrEnhanceYourCalm = 11'u32
-
-proc frameToString(frame: Http2Frame): string =
-  result = newStringOfCap(9 + frame.payload.len)
-  result.appendSerializedFrame(frame)
+  MaxPooledStreams = 64
+  MaxRetainedRequestBodyBytes = 64 * 1024
+  MaxRetainedRequestHeaders = 64
+  MaxRetainedHeaderEncodeBytes = 64 * 1024
+  MaxWriterBatchBytes = 16 * 1024
+  MaxWriterBatchEntries = 128
 
 proc wakeWaiters(waiters: var seq[CpsVoidFuture]) =
   for i in 0 ..< waiters.len:
@@ -115,7 +121,9 @@ proc newHttp2ServerConnection*(s: AsyncStream, config: HttpServerConfig,
     reader: reader,
     encoder: initHpackEncoder(),
     decoder: initHpackDecoder(),
+    headerEncodeScratch: @[],
     streams: initTable[uint32, Http2ServerStream](),
+    streamPool: @[],
     localWindowSize: DefaultWindowSize,
     remoteWindowSize: DefaultWindowSize,
     remoteSettings: initTable[uint16, uint32](),
@@ -131,7 +139,9 @@ proc newHttp2ServerConnection*(s: AsyncStream, config: HttpServerConfig,
     continuationStreamId: 0,
     outboundQueue: initDeque[OutboundWrite](),
     writerRunning: false,
-    writerWake: nil,
+    writerPayload: newStringOfCap(MaxWriterBatchBytes),
+    writerCompletions: newSeqOfCap[CpsVoidFuture](MaxWriterBatchEntries),
+    writerWrite: nil,
     writerError: nil,
     connectionWindowWaiters: @[],
     shutdownFlag: shutdownFlag,
@@ -146,40 +156,96 @@ proc failPendingOutbound(conn: Http2ServerConnection, err: ref CatchableError) =
     if not pending.completion.finished:
       pending.completion.fail(err)
 
-proc runWriter(conn: Http2ServerConnection): CpsVoidFuture {.cps.} =
-  var inFlightCompletion: CpsVoidFuture = nil
-  try:
-    while conn.running or conn.outboundQueue.len > 0:
-      if conn.outboundQueue.len == 0:
-        conn.writerWake = newCpsVoidFuture()
-        try:
-          await conn.writerWake
-        except CatchableError:
-          discard
-        conn.writerWake = nil
-        continue
+proc failWriterCompletions(conn: Http2ServerConnection,
+                           err: ref CatchableError) =
+  for fut in conn.writerCompletions:
+    if not fut.finished:
+      fut.fail(err)
+  conn.writerCompletions.setLen(0)
+  conn.writerPayload.setLen(0)
 
-      let pending = conn.outboundQueue.popFirst()
-      # Keep the selected payload in a CPS-hoisted local across the async
-      # transport write. Ordinary frame sends retain the established
-      # frame-owned path; coalesced writes opt into pre-serialized data.
-      let ownedSerialized = pending.serialized
-      let serialized =
-        if not ownedSerialized.isNil: ownedSerialized.data
-        else: frameToString(pending.frame)
-      inFlightCompletion = pending.completion
-      await conn.stream.write(serialized)
-      if not pending.completion.finished:
-        pending.completion.complete()
-      inFlightCompletion = nil
-  except CatchableError as e:
-    conn.writerError = e
+proc completeWriterCompletions(conn: Http2ServerConnection) =
+  for fut in conn.writerCompletions:
+    if not fut.finished:
+      fut.complete()
+  conn.writerCompletions.setLen(0)
+  conn.writerPayload.setLen(0)
+
+proc pumpWriter(conn: Http2ServerConnection)
+
+proc finishWriterWrite(conn: Http2ServerConnection) =
+  let writeFut = conn.writerWrite
+  conn.writerWrite = nil
+  if writeFut.isNil:
+    return
+  if writeFut.hasError:
+    let err = writeFut.getError()
+    conn.writerError = err
     conn.running = false
-    if not inFlightCompletion.isNil and not inFlightCompletion.finished:
-      inFlightCompletion.fail(e)
-    conn.failPendingOutbound(e)
-  finally:
+    conn.failWriterCompletions(err)
+    conn.failPendingOutbound(err)
     conn.writerRunning = false
+    return
+  conn.completeWriterCompletions()
+  conn.pumpWriter()
+
+proc pumpWriter(conn: Http2ServerConnection) =
+  if not conn.running:
+    conn.writerRunning = false
+    return
+
+  while conn.outboundQueue.len > 0:
+    conn.writerPayload.setLen(0)
+    conn.writerCompletions.setLen(0)
+
+    while conn.outboundQueue.len > 0 and
+        conn.writerCompletions.len < MaxWriterBatchEntries:
+      let next = conn.outboundQueue.peekFirst()
+      let nextLen =
+        if not next.serialized.isNil: next.serialized.data.len
+        else: 9 + next.frame.payload.len
+      if conn.writerPayload.len > 0 and
+          conn.writerPayload.len + nextLen > MaxWriterBatchBytes:
+        break
+
+      var pending = conn.outboundQueue.popFirst()
+      if not pending.serialized.isNil:
+        conn.writerPayload.add(pending.serialized.data)
+      else:
+        conn.writerPayload.appendSerializedFrame(pending.frame)
+      conn.writerCompletions.add(move(pending.completion))
+
+    let writeFut = conn.stream.write(conn.writerPayload)
+    if writeFut.finished:
+      if writeFut.hasError:
+        let err = writeFut.getError()
+        conn.writerError = err
+        conn.running = false
+        conn.failWriterCompletions(err)
+        conn.failPendingOutbound(err)
+        conn.writerRunning = false
+        return
+      conn.completeWriterCompletions()
+      continue
+
+    conn.writerWrite = writeFut
+    writeFut.addCallback(proc() =
+      conn.finishWriterWrite()
+    )
+    return
+
+  conn.writerRunning = false
+
+proc scheduleWriter(conn: Http2ServerConnection) =
+  if conn.writerRunning:
+    return
+  conn.writerRunning = true
+  if deferCurrentWorker(proc() =
+    if not deferCurrentWorker(proc() = conn.pumpWriter()):
+      getEventLoop().scheduleCallback(proc() = conn.pumpWriter())
+  ):
+    return
+  getEventLoop().scheduleCallback(proc() = conn.pumpWriter())
 
 proc enqueueWrite(conn: Http2ServerConnection, data: sink string): CpsVoidFuture =
   let fut = newCpsVoidFuture()
@@ -195,11 +261,7 @@ proc enqueueWrite(conn: Http2ServerConnection, data: sink string): CpsVoidFuture
     completion: fut
   ))
 
-  if not conn.writerRunning:
-    conn.writerRunning = true
-    conn.streamGroup.spawn(runWriter(conn))
-  elif not conn.writerWake.isNil and not conn.writerWake.finished:
-    conn.writerWake.complete()
+  conn.scheduleWriter()
 
   return fut
 
@@ -217,17 +279,14 @@ proc enqueueFrame(conn: Http2ServerConnection, frame: Http2Frame): CpsVoidFuture
     completion: fut
   ))
 
-  if not conn.writerRunning:
-    conn.writerRunning = true
-    conn.streamGroup.spawn(runWriter(conn))
-  elif not conn.writerWake.isNil and not conn.writerWake.finished:
-    conn.writerWake.complete()
+  conn.scheduleWriter()
 
   fut
 
-proc sendFrame*(conn: Http2ServerConnection, frame: Http2Frame): CpsVoidFuture {.cps.} =
+proc sendFrame*(conn: Http2ServerConnection,
+                frame: Http2Frame): CpsVoidFuture {.inline.} =
   ## Send frame through the active transport.
-  await enqueueFrame(conn, frame)
+  enqueueFrame(conn, frame)
 
 proc sendRstStream(conn: Http2ServerConnection, streamId: uint32,
                    errorCode: uint32): CpsVoidFuture {.cps.} =
@@ -302,6 +361,47 @@ proc applyPeerInitialWindowSize(conn: Http2ServerConnection,
 
   true
 
+proc acquireStream(conn: Http2ServerConnection,
+                   streamId: uint32): Http2ServerStream {.inline.} =
+  ## Stream IDs are short-lived but their small header/body vectors are useful
+  ## again on the same connection. Keep ownership reactor-local and recycle a
+  ## bounded number of stream objects to avoid allocator traffic.
+  if conn.streamPool.len > 0:
+    result = conn.streamPool.pop()
+  else:
+    result = Http2ServerStream()
+
+  result.id = streamId
+  result.state = ssOpen
+  result.requestHeaders.setLen(0)
+  result.requestBody.setLen(0)
+  result.endStream = false
+  result.adapter = nil
+  result.remoteWindowSize = conn.peerInitialWindowSize
+  result.bodyBytesRead = 0
+  result.headerBlock.setLen(0)
+  result.headerBlockEndStream = false
+  result.headersComplete = false
+  result.dispatched = false
+  result.windowWaiters.setLen(0)
+  result.expectedContentLength = -1
+
+proc recycleStream(conn: Http2ServerConnection,
+                   s: Http2ServerStream) {.inline.} =
+  s.adapter = nil
+  if s.requestHeaders.len > MaxRetainedRequestHeaders:
+    s.requestHeaders = @[]
+  else:
+    s.requestHeaders.setLen(0)
+  if s.requestBody.len > MaxRetainedRequestBodyBytes:
+    s.requestBody = @[]
+  else:
+    s.requestBody.setLen(0)
+  s.headerBlock.setLen(0)
+  s.windowWaiters.setLen(0)
+  if conn.streamPool.len < min(conn.maxConcurrentStreams, MaxPooledStreams):
+    conn.streamPool.add s
+
 proc closeStream(conn: Http2ServerConnection, streamId: uint32,
                  err: ref CatchableError = nil) =
   if streamId notin conn.streams:
@@ -315,6 +415,14 @@ proc closeStream(conn: Http2ServerConnection, streamId: uint32,
   else:
     failWaiters(s.windowWaiters, err)
   conn.streams.del(streamId)
+  conn.recycleStream(s)
+
+proc sendRstAndClose(conn: Http2ServerConnection, streamId: uint32,
+                     errorCode: uint32): CpsVoidFuture {.cps.} =
+  ## Preserve wire ordering on exceptional paths without forcing the ordinary
+  ## successful HEADERS path through a CPS state machine.
+  await sendRstStream(conn, streamId, errorCode)
+  conn.closeStream(streamId)
 
 proc peerStreamWasOpened(conn: Http2ServerConnection,
                          streamId: uint32): bool {.inline.} =
@@ -528,14 +636,12 @@ proc validateH2RequestHeaders(conn: Http2ServerConnection,
       else: discard
     else:
       sawRegular = true
-      if name != name.toLowerAscii:
-        return false
-      if not isValidHeaderName(name):
+      if not isValidLowercaseHeaderName(name):
         return false
       let lname = name
       if lname in ["connection", "proxy-connection", "keep-alive", "upgrade", "transfer-encoding"]:
         return false
-      if lname == "te" and value.toLowerAscii != "trailers":
+      if lname == "te" and not eqCaseInsensitive(value, "trailers"):
         return false
       if lname == "host":
         if sawHostHeader:
@@ -567,7 +673,8 @@ proc validateH2RequestHeaders(conn: Http2ServerConnection,
     return false
   if proto.len == 0 and ":protocol" in seenPseudo:
     return false
-  if authority.len > 0 and sawHostHeader and authority.toLowerAscii != hostValue.toLowerAscii:
+  if authority.len > 0 and sawHostHeader and
+      not eqCaseInsensitive(authority, hostValue):
     return false
 
   if meth == "CONNECT":
@@ -611,9 +718,7 @@ proc validateH2TrailerHeaders(conn: Http2ServerConnection,
 
     if name.len == 0 or isPseudoHeader(name):
       return false
-    if name != name.toLowerAscii:
-      return false
-    if not isValidHeaderName(name):
+    if not isValidLowercaseHeaderName(name):
       return false
     if value.len > 0 and not isValidHeaderValue(value):
       return false
@@ -641,14 +746,17 @@ proc validateH2ResponseHeaders(headers: seq[(string, string)]): bool =
     if name[0] == ':':
       return false
 
-    let lower = name.toLowerAscii
-    if not isValidHeaderName(lower):
+    if not isValidHeaderName(name):
       return false
     if not isValidHeaderValue(value):
       return false
 
-    if lower in ["connection", "proxy-connection", "keep-alive", "upgrade",
-                 "transfer-encoding", "te"]:
+    if eqCaseInsensitive(name, "connection") or
+        eqCaseInsensitive(name, "proxy-connection") or
+        eqCaseInsensitive(name, "keep-alive") or
+        eqCaseInsensitive(name, "upgrade") or
+        eqCaseInsensitive(name, "transfer-encoding") or
+        eqCaseInsensitive(name, "te"):
       return false
   var expectedLen = -1'i64
   if not extractExpectedContentLength(headers, expectedLen):
@@ -660,8 +768,7 @@ proc extractExpectedContentLength(headers: seq[(string, string)],
   var saw = false
   var parsedVal = -1'i64
   for i in 0 ..< headers.len:
-    let name = headers[i][0].toLowerAscii
-    if name != "content-length":
+    if not eqCaseInsensitive(headers[i][0], "content-length"):
       continue
     let value = headers[i][1]
     if value.len == 0:
@@ -780,54 +887,70 @@ proc serializeResponseHeaders(conn: Http2ServerConnection, streamId: uint32,
   if not validateH2ResponseHeaders(headers):
     raise newException(ValueError, "Invalid HTTP/2 response header")
 
-  var allHeaders: seq[(string, string)] = @[(":status", $statusCode)]
-  for i in 0 ..< headers.len:
-    allHeaders.add (headers[i][0].toLowerAscii, headers[i][1])
+  let encoded = addr conn.headerEncodeScratch
+  encoded[].setLen(0)
+  case statusCode
+  of 200: encoded[].add 0x88'u8
+  of 204: encoded[].add 0x89'u8
+  of 206: encoded[].add 0x8A'u8
+  of 304: encoded[].add 0x8B'u8
+  of 400: encoded[].add 0x8C'u8
+  of 404: encoded[].add 0x8D'u8
+  of 500: encoded[].add 0x8E'u8
+  else: conn.encoder.encodeHeaderInto(":status", $statusCode, encoded[])
 
-  let encoded = conn.encoder.encode(allHeaders)
+  for i in 0 ..< headers.len:
+    let name = headers[i][0]
+    if isValidLowercaseHeaderName(name):
+      conn.encoder.encodeHeaderInto(name, headers[i][1], encoded[])
+    else:
+      conn.encoder.encodeHeaderInto(name.toLowerAscii, headers[i][1], encoded[])
+
   let maxFrame = conn.currentPeerMaxFrameSize()
+  let frameCount = max(1, (encoded[].len + maxFrame - 1) div maxFrame)
+  result = newStringOfCap(encoded[].len + frameCount * 9)
   var offset = 0
   var first = true
 
-  while offset < encoded.len or (first and encoded.len == 0):
-    let remaining = encoded.len - offset
+  while offset < encoded[].len or (first and encoded[].len == 0):
+    let remaining = encoded[].len - offset
     let chunkLen =
       if remaining <= 0: 0
       else: min(maxFrame, remaining)
 
-    let chunk =
-      if chunkLen <= 0: @[]
-      else: encoded[offset ..< offset + chunkLen]
-
     var flags: uint8 = 0
     if first and endStream:
       flags = flags or FlagEndStream
-    if offset + chunkLen >= encoded.len:
+    if offset + chunkLen >= encoded[].len:
       flags = flags or FlagEndHeaders
 
     let ftype = if first: FrameHeaders else: FrameContinuation
-    result.appendSerializedFrame(Http2Frame(
-      frameType: ftype,
-      flags: flags,
-      streamId: streamId,
-      payload: chunk
-    ))
+    result.appendSerializedFrameSlice(
+      ftype, flags, streamId, encoded[], offset, chunkLen
+    )
 
     first = false
     offset += chunkLen
-    if encoded.len == 0:
+    if encoded[].len == 0:
       break
+
+  if encoded[].len > MaxRetainedHeaderEncodeBytes:
+    encoded[] = @[]
 
 proc sendResponseHeaders*(conn: Http2ServerConnection, streamId: uint32,
                           statusCode: int, headers: seq[(string, string)],
-                          endStream: bool): CpsVoidFuture {.cps.} =
+                          endStream: bool): CpsVoidFuture =
   ## A header block may span HEADERS plus CONTINUATION frames, but it remains
   ## one ordered write.  Coalescing those frames avoids a TLS record/syscall
-  ## per continuation without changing their HTTP/2 framing.
-  let serialized = conn.serializeResponseHeaders(
-    streamId, statusCode, headers, endStream
-  )
-  await enqueueWrite(conn, serialized)
+  ## per continuation without changing their HTTP/2 framing. Forwarding the
+  ## writer's future also avoids an otherwise redundant CPS result future.
+  try:
+    var serialized = conn.serializeResponseHeaders(
+      streamId, statusCode, headers, endStream
+    )
+    result = enqueueWrite(conn, move(serialized))
+  except CatchableError as e:
+    result = failedVoidFuture(e)
 
 proc waitForSendWindow(conn: Http2ServerConnection,
                        streamId: uint32): CpsVoidFuture {.cps.} =
@@ -937,8 +1060,10 @@ proc buildHttpRequest(s: Http2ServerStream,
                       conn: Http2ServerConnection): HttpRequest =
   var req = HttpRequest(
     streamId: s.id,
-    context: newTable[string, string](),
-    remoteAddr: conn.remoteAddr
+    context: nil,
+    remoteAddr: conn.remoteAddr,
+    maxWsFrameBytes: conn.config.maxWsFrameBytes,
+    maxWsMessageBytes: conn.config.maxWsMessageBytes
   )
 
   for i in 0 ..< s.requestHeaders.len:
@@ -954,7 +1079,7 @@ proc buildHttpRequest(s: Http2ServerStream,
 
   if req.authority.len == 0:
     for i in 0 ..< req.headers.len:
-      if req.headers[i][0].toLowerAscii == "host":
+      if eqCaseInsensitive(req.headers[i][0], "host"):
         req.authority = req.headers[i][1]
         break
 
@@ -964,12 +1089,9 @@ proc buildHttpRequest(s: Http2ServerStream,
     for i in 0 ..< s.requestBody.len:
       req.body[i] = char(s.requestBody[i])
 
-  ensureContext(req)
-  req.context["remote_addr"] = conn.remoteAddr
-  req.context["ws_max_frame_bytes"] = $conn.config.maxWsFrameBytes
-  req.context["ws_max_message_bytes"] = $conn.config.maxWsMessageBytes
   if conn.config.trustedForwardedHeaders and
       isTrustedProxyAddress(conn.remoteAddr, conn.config.trustedProxyCidrs):
+    ensureContext(req)
     req.context["trusted_proxy"] = "1"
 
   if s.adapter == nil:
@@ -988,7 +1110,9 @@ proc buildHttpRequest(s: Http2ServerStream,
       s.adapter.feedEof()
 
   req.stream = s.adapter.AsyncStream
-  req.reader = newBufferedReader(s.adapter.AsyncStream)
+  # HTTP/2 request bodies are fed through the stream adapter. A buffered
+  # reader is only needed by WebSocket framing and is created lazily there.
+  req.reader = nil
   return req
 
 proc dispatchHttp2Handler*(conn: Http2ServerConnection, streamId: uint32,
@@ -1071,29 +1195,29 @@ proc maybeDispatchStream(conn: Http2ServerConnection,
     conn.streamGroup.spawn(dispatchHttp2Handler(conn, s.id, req))
 
 proc completeHeaderBlock(conn: Http2ServerConnection,
-                         streamId: uint32): CpsVoidFuture {.cps.} =
+                         streamId: uint32): CpsVoidFuture =
   if streamId notin conn.streams:
-    return
+    return cachedCompletedVoidFuture()
   let s = conn.streams[streamId]
 
+  let isTrailerBlock = s.headersComplete
   var decoded: seq[(string, string)]
   var decodeFailed = false
   try:
-    decoded = conn.decoder.decode(s.headerBlock)
+    if isTrailerBlock:
+      conn.decoder.decodeInto(s.headerBlock, decoded)
+    else:
+      conn.decoder.decodeInto(s.headerBlock, s.requestHeaders)
   except CatchableError:
     decodeFailed = true
 
   if decodeFailed:
-    await failConnection(conn, H2ErrCompressionError)
-    return
+    return failConnection(conn, H2ErrCompressionError)
 
-  let isTrailerBlock = s.headersComplete
   if isTrailerBlock:
     if conn.config.maxHeaderCount > 0 and
         s.requestHeaders.len + decoded.len > conn.config.maxHeaderCount:
-      await sendRstStream(conn, streamId, H2ErrProtocolError)
-      conn.closeStream(streamId)
-      return
+      return sendRstAndClose(conn, streamId, H2ErrProtocolError)
 
     if conn.config.maxHeaderBytes > 0:
       var totalHeaderBytes = 0
@@ -1102,106 +1226,72 @@ proc completeHeaderBlock(conn: Http2ServerConnection,
       for i in 0 ..< decoded.len:
         totalHeaderBytes += decoded[i][0].len + decoded[i][1].len
       if totalHeaderBytes > conn.config.maxHeaderBytes:
-        await sendRstStream(conn, streamId, H2ErrProtocolError)
-        conn.closeStream(streamId)
-        return
+        return sendRstAndClose(conn, streamId, H2ErrProtocolError)
 
     if not validateH2TrailerHeaders(conn, decoded):
-      await sendRstStream(conn, streamId, H2ErrProtocolError)
-      conn.closeStream(streamId)
-      return
+      return sendRstAndClose(conn, streamId, H2ErrProtocolError)
     s.requestHeaders.add(decoded)
   else:
-    if not validateH2RequestHeaders(conn, decoded):
-      await sendRstStream(conn, streamId, H2ErrProtocolError)
-      conn.closeStream(streamId)
-      return
-    s.requestHeaders = decoded
+    if not validateH2RequestHeaders(conn, s.requestHeaders):
+      return sendRstAndClose(conn, streamId, H2ErrProtocolError)
     var expectedLen = -1'i64
-    if not extractExpectedContentLength(decoded, expectedLen):
-      await sendRstStream(conn, streamId, H2ErrProtocolError)
-      conn.closeStream(streamId)
-      return
+    if not extractExpectedContentLength(s.requestHeaders, expectedLen):
+      return sendRstAndClose(conn, streamId, H2ErrProtocolError)
     s.expectedContentLength = expectedLen
     s.headersComplete = true
   s.headerBlock.setLen(0)
 
   if s.headerBlockEndStream:
     if s.expectedContentLength >= 0 and int64(s.bodyBytesRead) != s.expectedContentLength:
-      await sendRstStream(conn, streamId, H2ErrProtocolError)
-      conn.closeStream(streamId)
-      return
+      return sendRstAndClose(conn, streamId, H2ErrProtocolError)
     s.endStream = true
     s.state = ssHalfClosedRemote
     if s.adapter != nil:
       s.adapter.feedEof()
 
   maybeDispatchStream(conn, s)
+  cachedCompletedVoidFuture()
 
 proc processHeadersFrame(conn: Http2ServerConnection,
-                         frame: Http2Frame): CpsVoidFuture {.cps.} =
+                         frame: Http2Frame): CpsVoidFuture =
   let streamId = frame.streamId
   if streamId == 0 or streamId mod 2 == 0:
-    await failConnection(conn, H2ErrProtocolError)
-    return
+    return failConnection(conn, H2ErrProtocolError)
 
   let streamExists = streamId in conn.streams
   if not streamExists:
     if streamId <= conn.lastStreamId:
-      await failConnection(conn, H2ErrProtocolError)
-      return
+      return failConnection(conn, H2ErrProtocolError)
     if not conn.acceptingNewStreams and streamId > conn.lastStreamId:
       conn.markPeerStreamSeen(streamId)
-      await sendRstStream(conn, streamId, H2ErrRefusedStream)
-      return
+      return sendRstStream(conn, streamId, H2ErrRefusedStream)
     conn.lastStreamId = streamId
 
   var s: Http2ServerStream
   if streamExists:
     s = conn.streams[streamId]
     if s.headersComplete and s.endStream:
-      await sendRstStream(conn, streamId, H2ErrStreamClosed)
-      conn.closeStream(streamId)
-      return
+      return sendRstAndClose(conn, streamId, H2ErrStreamClosed)
     if s.headersComplete and (frame.flags and FlagEndStream) == 0:
-      await sendRstStream(conn, streamId, H2ErrProtocolError)
-      conn.closeStream(streamId)
-      return
+      return sendRstAndClose(conn, streamId, H2ErrProtocolError)
   else:
     if conn.maxConcurrentStreams > 0 and conn.streams.len >= conn.maxConcurrentStreams:
       conn.markPeerStreamSeen(streamId)
-      await sendRstStream(conn, streamId, H2ErrRefusedStream)
-      return
-    s = Http2ServerStream(
-      id: streamId,
-      state: ssOpen,
-      endStream: false,
-      remoteWindowSize: conn.peerInitialWindowSize,
-      bodyBytesRead: 0,
-      headerBlock: @[],
-      headerBlockEndStream: false,
-      headersComplete: false,
-      dispatched: false,
-      windowWaiters: @[],
-      expectedContentLength: -1
-    )
+      return sendRstStream(conn, streamId, H2ErrRefusedStream)
+    s = conn.acquireStream(streamId)
     conn.streams[streamId] = s
     conn.markPeerStreamSeen(streamId)
 
   if (frame.flags and FlagPriority) != 0:
     var dependency = 0'u32
     if not extractHeadersPriorityDependency(frame, dependency):
-      await failConnection(conn, H2ErrProtocolError)
-      return
+      return failConnection(conn, H2ErrProtocolError)
     if dependency == streamId:
-      await sendRstStream(conn, streamId, H2ErrProtocolError)
-      conn.closeStream(streamId)
-      return
+      return sendRstAndClose(conn, streamId, H2ErrProtocolError)
 
   var fragment: seq[byte]
   if not extractHeadersFragment(frame, fragment):
-    await failConnection(conn, H2ErrProtocolError)
-    return
+    return failConnection(conn, H2ErrProtocolError)
 
   s.headerBlock.add(fragment)
   if (frame.flags and FlagEndStream) != 0:
@@ -1209,29 +1299,29 @@ proc processHeadersFrame(conn: Http2ServerConnection,
 
   if (frame.flags and FlagEndHeaders) == 0:
     conn.continuationStreamId = streamId
+    return cachedCompletedVoidFuture()
   else:
-    await completeHeaderBlock(conn, streamId)
+    return completeHeaderBlock(conn, streamId)
 
 proc processContinuationFrame(conn: Http2ServerConnection,
-                              frame: Http2Frame): CpsVoidFuture {.cps.} =
+                              frame: Http2Frame): CpsVoidFuture =
   if conn.continuationStreamId == 0 or frame.streamId != conn.continuationStreamId:
-    await failConnection(conn, H2ErrProtocolError)
-    return
+    return failConnection(conn, H2ErrProtocolError)
 
   if frame.streamId notin conn.streams:
-    await failConnection(conn, H2ErrProtocolError)
-    return
+    return failConnection(conn, H2ErrProtocolError)
 
   let s = conn.streams[frame.streamId]
   s.headerBlock.add(frame.payload)
 
   if (frame.flags and FlagEndHeaders) != 0:
     conn.continuationStreamId = 0
-    await completeHeaderBlock(conn, frame.streamId)
+    return completeHeaderBlock(conn, frame.streamId)
+  cachedCompletedVoidFuture()
 
-proc processServerFrame*(conn: Http2ServerConnection,
-                         frame: Http2Frame): CpsVoidFuture {.cps.} =
-  ## Apply an incoming HTTP/2 frame to server connection state.
+proc processServerFrameSlow(conn: Http2ServerConnection,
+                            frame: Http2Frame): CpsVoidFuture {.cps.} =
+  ## Apply less common HTTP/2 frame types through the general async path.
   if conn.continuationStreamId != 0 and
       (frame.frameType != FrameContinuation or frame.streamId != conn.continuationStreamId):
     await failConnection(conn, H2ErrProtocolError)
@@ -1499,6 +1589,25 @@ proc processServerFrame*(conn: Http2ServerConnection,
   else:
     discard
 
+proc processServerFrame*(conn: Http2ServerConnection,
+                         frame: Http2Frame): CpsVoidFuture =
+  ## Apply an incoming HTTP/2 frame to server connection state. HEADERS and
+  ## CONTINUATION parsing is synchronous until it encounters an actual write;
+  ## forwarding that future avoids three nested CPS result objects per normal
+  ## request while preserving the general async path for all other frame types.
+  if conn.continuationStreamId != 0 and
+      (frame.frameType != FrameContinuation or
+       frame.streamId != conn.continuationStreamId):
+    return failConnection(conn, H2ErrProtocolError)
+
+  case frame.frameType
+  of FrameHeaders:
+    processHeadersFrame(conn, frame)
+  of FrameContinuation:
+    processContinuationFrame(conn, frame)
+  else:
+    processServerFrameSlow(conn, frame)
+
 proc handleHttp2Connection*(stream: AsyncStream, config: HttpServerConfig,
                             handler: HttpHandler,
                             remoteAddr: string = "",
@@ -1548,11 +1657,16 @@ proc handleHttp2Connection*(stream: AsyncStream, config: HttpServerConfig,
     except CatchableError:
       discard
 
-  conn.running = false
-  if not conn.writerWake.isNil and not conn.writerWake.finished:
-    conn.writerWake.complete()
-
   let connErr = newException(system.IOError, "HTTP/2 connection closing")
+  conn.running = false
+  let pendingWrite = conn.writerWrite
+  conn.writerWrite = nil
+  if not pendingWrite.isNil and not pendingWrite.finished:
+    pendingWrite.cancel()
+  conn.failWriterCompletions(connErr)
+  conn.failPendingOutbound(connErr)
+  conn.writerRunning = false
+
   conn.failConnectionWaiters(connErr)
   for sid, s in conn.streams:
     if s.adapter != nil:
