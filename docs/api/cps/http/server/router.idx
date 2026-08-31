@@ -1,87 +1,100 @@
 nimTitle	router	cps/http/server/router.html	module cps/http/server/router		0
-nim	pskLiteral	cps/http/server/router.html#pskLiteral	PathSegmentKind.pskLiteral		15
-nim	pskParam	cps/http/server/router.html#pskParam	PathSegmentKind.pskParam		15
-nim	pskWildcard	cps/http/server/router.html#pskWildcard	PathSegmentKind.pskWildcard		15
-nim	PathSegmentKind	cps/http/server/router.html#PathSegmentKind	enum PathSegmentKind		15
-nim	PathSegment	cps/http/server/router.html#PathSegment	object PathSegment		20
-nim	RouteHandler	cps/http/server/router.html#RouteHandler	type RouteHandler		31
-nim	Middleware	cps/http/server/router.html#Middleware	type Middleware		34
-nim	RouteEntry	cps/http/server/router.html#RouteEntry	object RouteEntry		36
-nim	tsbIgnore	cps/http/server/router.html#tsbIgnore	TrailingSlashBehavior.tsbIgnore		45
-nim	tsbRedirect	cps/http/server/router.html#tsbRedirect	TrailingSlashBehavior.tsbRedirect		45
-nim	tsbStrip	cps/http/server/router.html#tsbStrip	TrailingSlashBehavior.tsbStrip		45
-nim	TrailingSlashBehavior	cps/http/server/router.html#TrailingSlashBehavior	enum TrailingSlashBehavior		45
-nim	Router	cps/http/server/router.html#Router	object Router		50
-nim	AcceptEntry	cps/http/server/router.html#AcceptEntry	object AcceptEntry		62
-nim	RequestExtractionError	cps/http/server/router.html#RequestExtractionError	object RequestExtractionError		66
-nim	raiseRequestExtractionError	cps/http/server/router.html#raiseRequestExtractionError,int,string	proc raiseRequestExtractionError(statusCode: int; msg: string)		69
-nim	parsePath	cps/http/server/router.html#parsePath,string	proc parsePath(pattern: string): seq[PathSegment]		79
-nim	segmentsToPattern	cps/http/server/router.html#segmentsToPattern,seq[PathSegment]	proc segmentsToPattern(segments: seq[PathSegment]): string		116
-nim	matchRouteWithParts	cps/http/server/router.html#matchRouteWithParts,seq[PathSegment],seq[string],Table[string,string]	proc matchRouteWithParts(segments: seq[PathSegment]; parts: seq[string];\n                    params: var Table[string, string]): bool		171
-nim	matchRoute	cps/http/server/router.html#matchRoute,seq[PathSegment],string	proc matchRoute(segments: seq[PathSegment]; path: string): (bool,\n    Table[string, string])		229
-nim	splitPathParts	cps/http/server/router.html#splitPathParts,string	proc splitPathParts(path: string): seq[string]		241
-nim	pathWithoutQuery	cps/http/server/router.html#pathWithoutQuery,string	proc pathWithoutQuery(path: string): string		249
-nim	parseQueryString	cps/http/server/router.html#parseQueryString,string	proc parseQueryString(path: string): Table[string, string]		256
-nim	parseFormBody	cps/http/server/router.html#parseFormBody,string	proc parseFormBody(body: string): Table[string, string]		277
-nim	parseJsonBody	cps/http/server/router.html#parseJsonBody,string	proc parseJsonBody(body: string): JsonNode		298
-nim	pathParamValue	cps/http/server/router.html#pathParamValue,Table[string,string],string	proc pathParamValue(pp: Table[string, string]; key: string): string		326
-nim	pathParamInt	cps/http/server/router.html#pathParamInt,Table[string,string],string	proc pathParamInt(pp: Table[string, string]; key: string): int		332
-nim	pathParamFloat	cps/http/server/router.html#pathParamFloat,Table[string,string],string	proc pathParamFloat(pp: Table[string, string]; key: string): float		336
-nim	pathParamBool	cps/http/server/router.html#pathParamBool,Table[string,string],string	proc pathParamBool(pp: Table[string, string]; key: string): bool		340
-nim	queryParamRequired	cps/http/server/router.html#queryParamRequired,Table[string,string],string	proc queryParamRequired(qp: Table[string, string]; key: string): string		344
-nim	queryParamInt	cps/http/server/router.html#queryParamInt,Table[string,string],string	proc queryParamInt(qp: Table[string, string]; key: string): int		350
-nim	queryParamInt	cps/http/server/router.html#queryParamInt,Table[string,string],string,int	proc queryParamInt(qp: Table[string, string]; key: string; defaultVal: int): int		354
-nim	queryParamInt	cps/http/server/router.html#queryParamInt,Table[string,string],string,string	proc queryParamInt(qp: Table[string, string]; key: string; defaultVal: string): int		360
-nim	queryParamFloat	cps/http/server/router.html#queryParamFloat,Table[string,string],string	proc queryParamFloat(qp: Table[string, string]; key: string): float		366
-nim	queryParamFloat	cps/http/server/router.html#queryParamFloat,Table[string,string],string,float	proc queryParamFloat(qp: Table[string, string]; key: string; defaultVal: float): float		370
-nim	queryParamFloat	cps/http/server/router.html#queryParamFloat,Table[string,string],string,string	proc queryParamFloat(qp: Table[string, string]; key: string; defaultVal: string): float		376
-nim	queryParamBool	cps/http/server/router.html#queryParamBool,Table[string,string],string	proc queryParamBool(qp: Table[string, string]; key: string): bool		382
-nim	queryParamBool	cps/http/server/router.html#queryParamBool,Table[string,string],string,bool	proc queryParamBool(qp: Table[string, string]; key: string; defaultVal: bool): bool		386
-nim	queryParamBool	cps/http/server/router.html#queryParamBool,Table[string,string],string,string	proc queryParamBool(qp: Table[string, string]; key: string; defaultVal: string): bool		392
-nim	extractClientIp	cps/http/server/router.html#extractClientIp,HttpRequest	proc extractClientIp(req: HttpRequest): string		402
-nim	extractBearerToken	cps/http/server/router.html#extractBearerToken,HttpRequest	proc extractBearerToken(req: HttpRequest): string		426
-nim	parseBasicAuth	cps/http/server/router.html#parseBasicAuth,HttpRequest	proc parseBasicAuth(req: HttpRequest): (string, string)		433
-nim	escapeHtml	cps/http/server/router.html#escapeHtml,string	proc escapeHtml(s: string): string		449
-nim	checkEtag	cps/http/server/router.html#checkEtag,HttpRequest,string	proc checkEtag(req: HttpRequest; etag: string): bool		461
-nim	parseAcceptHeader	cps/http/server/router.html#parseAcceptHeader,string	proc parseAcceptHeader(header: string): seq[AcceptEntry]		475
-nim	negotiateContentType	cps/http/server/router.html#negotiateContentType,string,seq[string]	proc negotiateContentType(acceptHeader: string; available: seq[string]): string		507
-nim	chainMiddleware	cps/http/server/router.html#chainMiddleware,seq[Middleware],HttpHandler	proc chainMiddleware(middlewares: seq[Middleware]; finalHandler: HttpHandler): HttpHandler		536
-nim	jsonResponse	cps/http/server/router.html#jsonResponse,int,string,seq[]	proc jsonResponse(code: int; body: string;\n             extraHeaders: seq[(string, string)] = @[]): HttpResponseBuilder		558
-nim	htmlResponse	cps/http/server/router.html#htmlResponse,int,string,seq[]	proc htmlResponse(code: int; body: string;\n             extraHeaders: seq[(string, string)] = @[]): HttpResponseBuilder		566
-nim	textResponse	cps/http/server/router.html#textResponse,int,string,seq[]	proc textResponse(code: int; body: string;\n             extraHeaders: seq[(string, string)] = @[]): HttpResponseBuilder		574
-nim	redirectResponse	cps/http/server/router.html#redirectResponse,string,int	proc redirectResponse(location: string; code: int = 302): HttpResponseBuilder		582
-nim	activeTemplateRenderer	cps/http/server/router.html#activeTemplateRenderer	var activeTemplateRenderer		590
-nim	setTemplateRenderer	cps/http/server/router.html#setTemplateRenderer,TemplateRenderer	proc setTemplateRenderer(renderer: TemplateRenderer)		592
-nim	setTemplateRenderer	cps/http/server/router.html#setTemplateRenderer,Router,TemplateRenderer	proc setTemplateRenderer(router: var Router; renderer: TemplateRenderer)		596
-nim	renderTemplate	cps/http/server/router.html#renderTemplate,HttpRequest,string,seq[]	proc renderTemplate(req: HttpRequest; name: string;\n               extraHeaders: seq[(string, string)] = @[]): HttpResponseBuilder		600
-nim	renderTemplate	cps/http/server/router.html#renderTemplate,HttpRequest,string,JsonNode,seq[]	proc renderTemplate(req: HttpRequest; name: string; vars: JsonNode;\n               extraHeaders: seq[(string, string)] = @[]): HttpResponseBuilder		611
-nim	getCookie	cps/http/server/router.html#getCookie,HttpRequest,string	proc getCookie(req: HttpRequest; name: string): string		626
-nim	setCookieHeader	cps/http/server/router.html#setCookieHeader,string,string,int,string,bool,bool,string	proc setCookieHeader(name: string; value: string; maxAge: int = -1;\n                path: string = "/"; httpOnly: bool = false;\n                secure: bool = false; sameSite: string = ""): (string, string)		640
-nim	guessContentType	cps/http/server/router.html#guessContentType,string	proc guessContentType(path: string): string		671
-nim	serveStaticFile	cps/http/server/router.html#serveStaticFile,string,string,string,HttpRequest,int,string	proc serveStaticFile(fsDir: string; urlPrefix: string; reqPath: string;\n                req: HttpRequest = HttpRequest(); maxAge: int = 3600;\n                fallbackFile: string = ""): CpsFuture[HttpResponseBuilder]		705
-nim	fileResponse	cps/http/server/router.html#fileResponse,string,string	proc fileResponse(filePath: string; contentType: string = ""): CpsFuture[\n    HttpResponseBuilder]		791
-nim	downloadResponse	cps/http/server/router.html#downloadResponse,string,string	proc downloadResponse(filePath: string; filename: string = ""): CpsFuture[\n    HttpResponseBuilder]		806
-nim	listRoutes	cps/http/server/router.html#listRoutes,Router	proc listRoutes(router: Router): string		829
-nim	setAppState	cps/http/server/router.html#setAppState,Router,RootRef	proc setAppState(router: var Router; state: RootRef)		837
-nim	urlFor	cps/http/server/router.html#urlFor,Router,string,Table[string,string]	proc urlFor(router: Router; name: string;\n       params: Table[string, string] = initTable[string, string]()): string		845
-nim	dispatch	cps/http/server/router.html#dispatch,Router,HttpRequest	proc dispatch(router: Router; req: HttpRequest): CpsFuture[HttpResponseBuilder]		921
-nim	toHandler	cps/http/server/router.html#toHandler,Router	proc toHandler(router: Router): HttpHandler		1238
-nim	mountRouter	cps/http/server/router.html#mountRouter,Router,string,Router,seq[Middleware]	proc mountRouter(parent: var Router; prefix: string; child: Router;\n            middlewares: seq[Middleware] = @[])		1248
-nim	mountHandler	cps/http/server/router.html#mountHandler,Router,string,HttpHandler,seq[Middleware]	proc mountHandler(parent: var Router; prefix: string; handler: HttpHandler;\n             middlewares: seq[Middleware] = @[])		1272
-nim	logMiddleware	cps/http/server/router.html#logMiddleware,HttpRequest,HttpHandler	proc logMiddleware(req: HttpRequest; next: HttpHandler): CpsFuture[\n    HttpResponseBuilder]		1299
-nim	corsMiddleware	cps/http/server/router.html#corsMiddleware,string	proc corsMiddleware(allowOrigin: string = "*"): Middleware		1315
-nim	corsMiddleware	cps/http/server/router.html#corsMiddleware,seq[string],seq[string],seq[string],seq[string],bool,int	proc corsMiddleware(allowOrigins: seq[string]; allowMethods: seq[string] = @["GET",\n    "POST", "PUT", "DELETE", "PATCH"]; allowHeaders: seq[string] = @[];\n               exposeHeaders: seq[string] = @[]; allowCredentials: bool = false;\n               maxAge: int = 0): Middleware		1331
-nim	securityHeadersMiddleware	cps/http/server/router.html#securityHeadersMiddleware,int,bool,string,bool,string	proc securityHeadersMiddleware(hsts: int = 31536000; noSniff: bool = true;\n                          frameOptions: string = "DENY";\n                          xssProtection: bool = true; referrerPolicy: string = "strict-origin-when-cross-origin"): Middleware		1414
-nim	requestIdCounter	cps/http/server/router.html#requestIdCounter	var requestIdCounter		1450
-nim	requestIdMiddleware	cps/http/server/router.html#requestIdMiddleware,string	proc requestIdMiddleware(headerName: string = "X-Request-ID"): Middleware		1452
-nim	bodySizeLimitMiddleware	cps/http/server/router.html#bodySizeLimitMiddleware,int	proc bodySizeLimitMiddleware(maxBytes: int): Middleware		1478
-nim	timeoutMiddleware	cps/http/server/router.html#timeoutMiddleware,int	proc timeoutMiddleware(timeoutMs: int): Middleware		1498
-nim	accessLogMiddleware	cps/http/server/router.html#accessLogMiddleware,string	proc accessLogMiddleware(format: string = "combined"): Middleware		1526
-nim	methodOverrideMiddleware	cps/http/server/router.html#methodOverrideMiddleware	proc methodOverrideMiddleware(): Middleware		1552
-nim	compressionMiddleware	cps/http/server/router.html#compressionMiddleware,int,CompressionLevel	proc compressionMiddleware(minBodySize: int = 256;\n                      level: CompressionLevel = clDefault): Middleware		1571
-nimgrp	corsmiddleware	cps/http/server/router.html#corsMiddleware-procs-all	proc		1315
-nimgrp	queryparamint	cps/http/server/router.html#queryParamInt-procs-all	proc		350
-nimgrp	queryparamfloat	cps/http/server/router.html#queryParamFloat-procs-all	proc		366
-nimgrp	rendertemplate	cps/http/server/router.html#renderTemplate-procs-all	proc		600
-nimgrp	settemplaterenderer	cps/http/server/router.html#setTemplateRenderer-procs-all	proc		592
-nimgrp	queryparambool	cps/http/server/router.html#queryParamBool-procs-all	proc		382
+nim	RouteParams	cps/http/server/router.html#RouteParams	object RouteParams		21
+nim	pskLiteral	cps/http/server/router.html#pskLiteral	PathSegmentKind.pskLiteral		29
+nim	pskParam	cps/http/server/router.html#pskParam	PathSegmentKind.pskParam		29
+nim	pskWildcard	cps/http/server/router.html#pskWildcard	PathSegmentKind.pskWildcard		29
+nim	PathSegmentKind	cps/http/server/router.html#PathSegmentKind	enum PathSegmentKind		29
+nim	PathSegment	cps/http/server/router.html#PathSegment	object PathSegment		34
+nim	RouteHandler	cps/http/server/router.html#RouteHandler	type RouteHandler		45
+nim	Middleware	cps/http/server/router.html#Middleware	type Middleware		48
+nim	RouteEntry	cps/http/server/router.html#RouteEntry	object RouteEntry		50
+nim	tsbIgnore	cps/http/server/router.html#tsbIgnore	TrailingSlashBehavior.tsbIgnore		59
+nim	tsbRedirect	cps/http/server/router.html#tsbRedirect	TrailingSlashBehavior.tsbRedirect		59
+nim	tsbStrip	cps/http/server/router.html#tsbStrip	TrailingSlashBehavior.tsbStrip		59
+nim	TrailingSlashBehavior	cps/http/server/router.html#TrailingSlashBehavior	enum TrailingSlashBehavior		59
+nim	Router	cps/http/server/router.html#Router	type Router		64
+nim	AcceptEntry	cps/http/server/router.html#AcceptEntry	object AcceptEntry		80
+nim	queryParamsView	cps/http/server/router.html#queryParamsView,ByteView	proc queryParamsView(path: ByteView): RouteParams		106
+nim	`[]`	cps/http/server/router.html#[],RouteParams,string	proc `[]`(params: RouteParams; key: string): ByteView		153
+nim	contains	cps/http/server/router.html#contains,RouteParams,string	proc contains(params: RouteParams; key: string): bool		164
+nim	getOrDefault	cps/http/server/router.html#getOrDefault,RouteParams,string	proc getOrDefault(params: RouteParams; key: string; default = ByteView()): ByteView		187
+nim	RequestExtractionError	cps/http/server/router.html#RequestExtractionError	object RequestExtractionError		192
+nim	raiseRequestExtractionError	cps/http/server/router.html#raiseRequestExtractionError,int,string	proc raiseRequestExtractionError(statusCode: int; msg: string)		195
+nim	parsePath	cps/http/server/router.html#parsePath,string	proc parsePath(pattern: string): seq[PathSegment]		205
+nim	segmentsToPattern	cps/http/server/router.html#segmentsToPattern,seq[PathSegment]	proc segmentsToPattern(segments: seq[PathSegment]): string		242
+nim	matchRouteWithParts	cps/http/server/router.html#matchRouteWithParts,seq[PathSegment],seq[string],RouteParams	proc matchRouteWithParts(segments: seq[PathSegment]; parts: seq[string];\n                    params: var RouteParams): bool		345
+nim	matchRoute	cps/http/server/router.html#matchRoute,seq[PathSegment],string	proc matchRoute(segments: seq[PathSegment]; path: string): (bool, RouteParams)		409
+nim	splitPathParts	cps/http/server/router.html#splitPathParts,string	proc splitPathParts(path: string): seq[string]		421
+nim	pathWithoutQuery	cps/http/server/router.html#pathWithoutQuery,string	proc pathWithoutQuery(path: string): string		429
+nim	parseQueryString	cps/http/server/router.html#parseQueryString,string	proc parseQueryString(path: string): Table[string, string]		436
+nim	parseFormBody	cps/http/server/router.html#parseFormBody,string	proc parseFormBody(body: string): Table[string, string]		457
+nim	parseFormBody	cps/http/server/router.html#parseFormBody,ByteView	proc parseFormBody(body: ByteView): Table[string, string]		474
+nim	parseJsonBody	cps/http/server/router.html#parseJsonBody,string	proc parseJsonBody(body: string): JsonNode		482
+nim	parseJsonBody	cps/http/server/router.html#parseJsonBody,ByteView	proc parseJsonBody(body: ByteView): JsonNode		486
+nim	pathParamValue	cps/http/server/router.html#pathParamValue,RouteParams,string	proc pathParamValue(pp: RouteParams; key: string): ByteView		514
+nim	pathParamInt	cps/http/server/router.html#pathParamInt,RouteParams,string	proc pathParamInt(pp: RouteParams; key: string): int		520
+nim	pathParamFloat	cps/http/server/router.html#pathParamFloat,RouteParams,string	proc pathParamFloat(pp: RouteParams; key: string): float		524
+nim	pathParamBool	cps/http/server/router.html#pathParamBool,RouteParams,string	proc pathParamBool(pp: RouteParams; key: string): bool		528
+nim	queryParamRequired	cps/http/server/router.html#queryParamRequired,RouteParams,string	proc queryParamRequired(qp: RouteParams; key: string): ByteView		532
+nim	queryParamInt	cps/http/server/router.html#queryParamInt,RouteParams,string	proc queryParamInt(qp: RouteParams; key: string): int		538
+nim	queryParamInt	cps/http/server/router.html#queryParamInt,RouteParams,string,int	proc queryParamInt(qp: RouteParams; key: string; defaultVal: int): int		542
+nim	queryParamInt	cps/http/server/router.html#queryParamInt,RouteParams,string,string	proc queryParamInt(qp: RouteParams; key: string; defaultVal: string): int		548
+nim	queryParamFloat	cps/http/server/router.html#queryParamFloat,RouteParams,string	proc queryParamFloat(qp: RouteParams; key: string): float		554
+nim	queryParamFloat	cps/http/server/router.html#queryParamFloat,RouteParams,string,float	proc queryParamFloat(qp: RouteParams; key: string; defaultVal: float): float		558
+nim	queryParamFloat	cps/http/server/router.html#queryParamFloat,RouteParams,string,string	proc queryParamFloat(qp: RouteParams; key: string; defaultVal: string): float		564
+nim	queryParamBool	cps/http/server/router.html#queryParamBool,RouteParams,string	proc queryParamBool(qp: RouteParams; key: string): bool		570
+nim	queryParamBool	cps/http/server/router.html#queryParamBool,RouteParams,string,bool	proc queryParamBool(qp: RouteParams; key: string; defaultVal: bool): bool		574
+nim	queryParamBool	cps/http/server/router.html#queryParamBool,RouteParams,string,string	proc queryParamBool(qp: RouteParams; key: string; defaultVal: string): bool		580
+nim	extractClientIp	cps/http/server/router.html#extractClientIp,HttpRequest	proc extractClientIp(req: HttpRequest): string		590
+nim	extractBearerToken	cps/http/server/router.html#extractBearerToken,HttpRequest	proc extractBearerToken(req: HttpRequest): string		614
+nim	parseBasicAuth	cps/http/server/router.html#parseBasicAuth,HttpRequest	proc parseBasicAuth(req: HttpRequest): (string, string)		622
+nim	escapeHtml	cps/http/server/router.html#escapeHtml,string	proc escapeHtml(s: string): string		639
+nim	escapeHtml	cps/http/server/router.html#escapeHtml,ByteView	proc escapeHtml(s: ByteView): string		651
+nim	checkEtag	cps/http/server/router.html#checkEtag,HttpRequest,string	proc checkEtag(req: HttpRequest; etag: string): bool		663
+nim	parseAcceptHeader	cps/http/server/router.html#parseAcceptHeader,string	proc parseAcceptHeader(header: string): seq[AcceptEntry]		677
+nim	negotiateContentType	cps/http/server/router.html#negotiateContentType,string,seq[string]	proc negotiateContentType(acceptHeader: string; available: seq[string]): string		709
+nim	negotiateContentType	cps/http/server/router.html#negotiateContentType,ByteView,seq[string]	proc negotiateContentType(acceptHeader: ByteView; available: seq[string]): string		734
+nim	chainMiddleware	cps/http/server/router.html#chainMiddleware,seq[Middleware],HttpHandler	proc chainMiddleware(middlewares: seq[Middleware]; finalHandler: HttpHandler): HttpHandler		743
+nim	jsonResponse	cps/http/server/router.html#jsonResponse,int,string,seq[]	proc jsonResponse(code: int; body: string;\n             extraHeaders: seq[(string, string)] = @[]): HttpResponseBuilder		765
+nim	htmlResponse	cps/http/server/router.html#htmlResponse,int,string,seq[]	proc htmlResponse(code: int; body: string;\n             extraHeaders: seq[(string, string)] = @[]): HttpResponseBuilder		773
+nim	textResponse	cps/http/server/router.html#textResponse,int,string,seq[]	proc textResponse(code: int; body: string;\n             extraHeaders: seq[(string, string)] = @[]): HttpResponseBuilder		781
+nim	redirectResponse	cps/http/server/router.html#redirectResponse,string,int	proc redirectResponse(location: string; code: int = 302): HttpResponseBuilder		789
+nim	activeTemplateRenderer	cps/http/server/router.html#activeTemplateRenderer	var activeTemplateRenderer		797
+nim	setTemplateRenderer	cps/http/server/router.html#setTemplateRenderer,TemplateRenderer	proc setTemplateRenderer(renderer: TemplateRenderer)		799
+nim	setTemplateRenderer	cps/http/server/router.html#setTemplateRenderer,Router,TemplateRenderer	proc setTemplateRenderer(router: var Router; renderer: TemplateRenderer)		803
+nim	renderTemplate	cps/http/server/router.html#renderTemplate,HttpRequest,string,seq[]	proc renderTemplate(req: HttpRequest; name: string;\n               extraHeaders: seq[(string, string)] = @[]): HttpResponseBuilder		807
+nim	renderTemplate	cps/http/server/router.html#renderTemplate,HttpRequest,string,JsonNode,seq[]	proc renderTemplate(req: HttpRequest; name: string; vars: JsonNode;\n               extraHeaders: seq[(string, string)] = @[]): HttpResponseBuilder		818
+nim	getCookie	cps/http/server/router.html#getCookie,HttpRequest,string	proc getCookie(req: HttpRequest; name: string): string		833
+nim	setCookieHeader	cps/http/server/router.html#setCookieHeader,string,string,int,string,bool,bool,string	proc setCookieHeader(name: string; value: string; maxAge: int = -1;\n                path: string = "/"; httpOnly: bool = false;\n                secure: bool = false; sameSite: string = ""): (string, string)		847
+nim	guessContentType	cps/http/server/router.html#guessContentType,string	proc guessContentType(path: string): string		878
+nim	serveStaticFile	cps/http/server/router.html#serveStaticFile,string,string,string,HttpRequest,int,string	proc serveStaticFile(fsDir: string; urlPrefix: string; reqPath: string;\n                req: HttpRequest = HttpRequest(); maxAge: int = 3600;\n                fallbackFile: string = ""): CpsFuture[HttpResponseBuilder]		912
+nim	fileResponse	cps/http/server/router.html#fileResponse,string,string	proc fileResponse(filePath: string; contentType: string = ""): CpsFuture[\n    HttpResponseBuilder]		998
+nim	downloadResponse	cps/http/server/router.html#downloadResponse,string,string	proc downloadResponse(filePath: string; filename: string = ""): CpsFuture[\n    HttpResponseBuilder]		1013
+nim	listRoutes	cps/http/server/router.html#listRoutes,Router	proc listRoutes(router: Router): string		1036
+nim	setAppState	cps/http/server/router.html#setAppState,Router,RootRef	proc setAppState(router: var Router; state: RootRef)		1045
+nim	urlFor	cps/http/server/router.html#urlFor,Router,string,Table[string,string]	proc urlFor(router: Router; name: string;\n       params: Table[string, string] = initTable[string, string]()): string		1053
+nim	dispatch	cps/http/server/router.html#dispatch,Router,HttpRequest	proc dispatch(router: Router; req: HttpRequest): CpsFuture[HttpResponseBuilder]		1132
+nim	toHandler	cps/http/server/router.html#toHandler,Router	proc toHandler(router: Router): HttpHandler		1454
+nim	mountRouter	cps/http/server/router.html#mountRouter,Router,string,Router,seq[Middleware]	proc mountRouter(parent: var Router; prefix: string; child: Router;\n            middlewares: seq[Middleware] = @[])		1464
+nim	mountHandler	cps/http/server/router.html#mountHandler,Router,string,HttpHandler,seq[Middleware]	proc mountHandler(parent: var Router; prefix: string; handler: HttpHandler;\n             middlewares: seq[Middleware] = @[])		1488
+nim	logMiddleware	cps/http/server/router.html#logMiddleware,HttpRequest,HttpHandler	proc logMiddleware(req: HttpRequest; next: HttpHandler): CpsFuture[\n    HttpResponseBuilder]		1515
+nim	corsMiddleware	cps/http/server/router.html#corsMiddleware,string	proc corsMiddleware(allowOrigin: string = "*"): Middleware		1531
+nim	corsMiddleware	cps/http/server/router.html#corsMiddleware,seq[string],seq[string],seq[string],seq[string],bool,int	proc corsMiddleware(allowOrigins: seq[string]; allowMethods: seq[string] = @["GET",\n    "POST", "PUT", "DELETE", "PATCH"]; allowHeaders: seq[string] = @[];\n               exposeHeaders: seq[string] = @[]; allowCredentials: bool = false;\n               maxAge: int = 0): Middleware		1547
+nim	securityHeadersMiddleware	cps/http/server/router.html#securityHeadersMiddleware,int,bool,string,bool,string	proc securityHeadersMiddleware(hsts: int = 31536000; noSniff: bool = true;\n                          frameOptions: string = "DENY";\n                          xssProtection: bool = true; referrerPolicy: string = "strict-origin-when-cross-origin"): Middleware		1630
+nim	requestIdCounter	cps/http/server/router.html#requestIdCounter	var requestIdCounter		1666
+nim	requestIdMiddleware	cps/http/server/router.html#requestIdMiddleware,string	proc requestIdMiddleware(headerName: string = "X-Request-ID"): Middleware		1668
+nim	bodySizeLimitMiddleware	cps/http/server/router.html#bodySizeLimitMiddleware,int	proc bodySizeLimitMiddleware(maxBytes: int): Middleware		1693
+nim	timeoutMiddleware	cps/http/server/router.html#timeoutMiddleware,int	proc timeoutMiddleware(timeoutMs: int): Middleware		1713
+nim	accessLogMiddleware	cps/http/server/router.html#accessLogMiddleware,string	proc accessLogMiddleware(format: string = "combined"): Middleware		1741
+nim	methodOverrideMiddleware	cps/http/server/router.html#methodOverrideMiddleware	proc methodOverrideMiddleware(): Middleware		1767
+nim	compressionMiddleware	cps/http/server/router.html#compressionMiddleware,int,CompressionLevel	proc compressionMiddleware(minBodySize: int = 256;\n                      level: CompressionLevel = clDefault): Middleware		1786
+nimgrp	escapehtml	cps/http/server/router.html#escapeHtml-procs-all	proc		639
+nimgrp	corsmiddleware	cps/http/server/router.html#corsMiddleware-procs-all	proc		1531
+nimgrp	queryparamint	cps/http/server/router.html#queryParamInt-procs-all	proc		538
+nimgrp	queryparamfloat	cps/http/server/router.html#queryParamFloat-procs-all	proc		554
+nimgrp	rendertemplate	cps/http/server/router.html#renderTemplate-procs-all	proc		807
+nimgrp	settemplaterenderer	cps/http/server/router.html#setTemplateRenderer-procs-all	proc		799
+nimgrp	parsejsonbody	cps/http/server/router.html#parseJsonBody-procs-all	proc		482
+nimgrp	negotiatecontenttype	cps/http/server/router.html#negotiateContentType-procs-all	proc		709
+nimgrp	queryparambool	cps/http/server/router.html#queryParamBool-procs-all	proc		570
+nimgrp	parseformbody	cps/http/server/router.html#parseFormBody-procs-all	proc		457

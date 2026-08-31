@@ -55,26 +55,36 @@
   <details open>
     <summary><a class="reference reference-toplevel" href="#7" id="57">Types</a></summary>
     <ul class="simple simple-toc-section">
-      <li><a class="reference" href="#HttpHandler" title="HttpHandler = proc (req: HttpRequest): CpsFuture[HttpResponseBuilder] {.closure.}">HttpHandler</a></li>
+      <li><a class="reference" href="#ByteView" title="ByteView = object
+  data*: ptr UncheckedArray[char]
+  len*: int">ByteView</a></li>
+<li><a class="reference" href="#HttpHandler" title="HttpHandler = proc (req: HttpRequest): CpsFuture[HttpResponseBuilder] {.closure.}">HttpHandler</a></li>
+<li><a class="reference" href="#HttpHeadersView" title="HttpHeadersView = object
+  case
+  of hhsRawHttp1:
+  of hhsPairs:">HttpHeadersView</a></li>
+<li><a class="reference" href="#HttpHeaderView" title="HttpHeaderView = tuple[name: ByteView, value: ByteView]">HttpHeaderView</a></li>
 <li><a class="reference" href="#HttpRequest" title="HttpRequest = object
-  meth*: string
-  path*: string
-  httpVersion*: string
-  headers*: seq[(string, string)]
-  body*: string
+  meth*: ByteView
+  path*: ByteView
+  httpVersion*: ByteView
+  headers*: HttpHeadersView
+  body*: ByteView
   remoteAddr*: string        ## Remote peer IP address.
   streamId*: uint32          ## HTTP/2 stream ID (0 for HTTP/1.1)
-  authority*: string         ## HTTP/2 :authority pseudo-header
-  scheme*: string            ## HTTP/2 :scheme pseudo-header
+  authority*: ByteView       ## HTTP/2 :authority pseudo-header
+  scheme*: ByteView          ## HTTP/2 :scheme pseudo-header
   stream*: AsyncStream       ## Underlying transport (for SSE/WebSocket). nil for HTTP/2.
   reader*: BufferedReader    ## HTTP/1.1 buffered reader (for WebSocket). nil for HTTP/2.
   templateRenderer*: TemplateRenderer ## Router-scoped template renderer (if configured).
   context*: TableRef[string, string] ## Shared per-request context across request copies
-  appState*: RootRef         ## Typed app state injected by router dispatch">HttpRequest</a></li>
+  appState*: RootRef         ## Typed app state injected by router dispatch
+  maxWsFrameBytes*: int      ## Per-request WebSocket frame limit inherited from the server.
+  maxWsMessageBytes*: int    ## Per-request WebSocket message limit inherited from the server.">HttpRequest</a></li>
 <li><a class="reference" href="#HttpResponseBuilder" title="HttpResponseBuilder = object
   statusCode*: int
   headers*: seq[(string, string)]
-  body*: string
+  body*: ByteView
   control*: ResponseControl">HttpResponseBuilder</a></li>
 <li><a class="reference" href="#HttpServer" title="HttpServer = ref object
   config*: HttpServerConfig
@@ -83,6 +93,7 @@
   running*: bool
   boundPort*: int
   connGroup*: TaskGroup
+  acceptStopSignal*: CpsVoidFuture
   shutdownStarted*: bool
   onStartCallbacks*: seq[proc ()]
   onShutdownCallbacks*: seq[proc ()]">HttpServer</a></li>
@@ -134,8 +145,52 @@
   <details open>
     <summary><a class="reference reference-toplevel" href="#12" id="62">Procs</a></summary>
     <ul class="simple simple-toc-section">
-      <ul class="simple nested-toc-section">bindAndListen
+      <ul class="simple nested-toc-section">!=
+  <li><a class="reference" href="#%21%3D%2CByteView%2Cstring" title="`!=`(a: ByteView; b: string): bool">`!=`(a: ByteView; b: string): bool</a></li>
+<li><a class="reference" href="#%21%3D%2Cstring%2CByteView" title="`!=`(a: string; b: ByteView): bool">`!=`(a: string; b: ByteView): bool</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">$
+  <li><a class="reference" href="#%24%2CByteView" title="`$`(v: ByteView): string">`$`(v: ByteView): string</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">%
+  <li><a class="reference" href="#%25%2CByteView" title="`%`(v: ByteView): JsonNode">`%`(v: ByteView): JsonNode</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">&
+  <li><a class="reference" href="#%26%2CByteView%2Cstring" title="`&amp;`(a: ByteView; b: string): string">`&amp;`(a: ByteView; b: string): string</a></li>
+<li><a class="reference" href="#%26%2Cstring%2CByteView" title="`&amp;`(a: string; b: ByteView): string">`&amp;`(a: string; b: ByteView): string</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">==
+  <li><a class="reference" href="#%3D%3D%2CByteView%2CByteView" title="`==`(a, b: ByteView): bool">`==`(a, b: ByteView): bool</a></li>
+<li><a class="reference" href="#%3D%3D%2CByteView%2Cstring" title="`==`(a: ByteView; b: string): bool">`==`(a: ByteView; b: string): bool</a></li>
+<li><a class="reference" href="#%3D%3D%2Cstring%2CByteView" title="`==`(a: string; b: ByteView): bool">`==`(a: string; b: ByteView): bool</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">[]
+  <li><a class="reference" href="#%5B%5D%2CHttpHeadersView%2Cint" title="`[]`(headers: HttpHeadersView; index: int): HttpHeaderView">`[]`(headers: HttpHeadersView; index: int): HttpHeaderView</a></li>
+<li><a class="reference" href="#%5B%5D%2CByteView%2CBackwardsIndex" title="`[]`(v: ByteView; i: BackwardsIndex): char">`[]`(v: ByteView; i: BackwardsIndex): char</a></li>
+<li><a class="reference" href="#%5B%5D%2CByteView%2Cint" title="`[]`(v: ByteView; i: int): char">`[]`(v: ByteView; i: int): char</a></li>
+<li><a class="reference" href="#%5B%5D%2CByteView%2CHSlice%5Bint%2CBackwardsIndex%5D" title="`[]`(v: ByteView; slice: HSlice[int, BackwardsIndex]): ByteView">`[]`(v: ByteView; slice: HSlice[int, BackwardsIndex]): ByteView</a></li>
+<li><a class="reference" href="#%5B%5D%2CByteView%2CHSlice%5Bint%2Cint%5D" title="`[]`(v: ByteView; slice: HSlice[int, int]): ByteView">`[]`(v: ByteView; slice: HSlice[int, int]): ByteView</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">bindAndListen
   <li><a class="reference" href="#bindAndListen%2CHttpServer" title="bindAndListen(server: HttpServer)">bindAndListen(server: HttpServer)</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">clearBody
+  <li><a class="reference" href="#clearBody%2CHttpResponseBuilder" title="clearBody(resp: var HttpResponseBuilder)">clearBody(resp: var HttpResponseBuilder)</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">cmpIgnoreCase
+  <li><a class="reference" href="#cmpIgnoreCase%2CByteView%2Cstring" title="cmpIgnoreCase(a: ByteView; b: string): int">cmpIgnoreCase(a: ByteView; b: string): int</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">contains
+  <li><a class="reference" href="#contains%2CByteView%2Cstring" title="contains(v: ByteView; needle: string): bool">contains(v: ByteView; needle: string): bool</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">continueResponse
@@ -147,11 +202,18 @@
 
 </ul>
 <ul class="simple nested-toc-section">eqCaseInsensitive
-  <li><a class="reference" href="#eqCaseInsensitive%2Cstring%2Cstring" title="eqCaseInsensitive(a, b: string): bool">eqCaseInsensitive(a, b: string): bool</a></li>
+  <li><a class="reference" href="#eqCaseInsensitive%2CByteView%2CByteView" title="eqCaseInsensitive(a, b: ByteView): bool">eqCaseInsensitive(a, b: ByteView): bool</a></li>
+<li><a class="reference" href="#eqCaseInsensitive%2Cstring%2Cstring" title="eqCaseInsensitive(a, b: string): bool">eqCaseInsensitive(a, b: string): bool</a></li>
+<li><a class="reference" href="#eqCaseInsensitive%2CByteView%2Cstring" title="eqCaseInsensitive(a: ByteView; b: string): bool">eqCaseInsensitive(a: ByteView; b: string): bool</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">find
+  <li><a class="reference" href="#find%2CByteView%2Cchar%2Cint" title="find(v: ByteView; needle: char; start = 0): int">find(v: ByteView; needle: char; start = 0): int</a></li>
+<li><a class="reference" href="#find%2CByteView%2Cstring%2Cint" title="find(v: ByteView; needle: string; start = 0): int">find(v: ByteView; needle: string; start = 0): int</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">getHeader
-  <li><a class="reference" href="#getHeader%2CHttpRequest%2Cstring" title="getHeader(req: HttpRequest; name: string): string">getHeader(req: HttpRequest; name: string): string</a></li>
+  <li><a class="reference" href="#getHeader%2CHttpRequest%2Cstring" title="getHeader(req: HttpRequest; name: string): ByteView">getHeader(req: HttpRequest; name: string): ByteView</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">getPort
@@ -166,16 +228,30 @@
   <li><a class="reference" href="#handledResponse" title="handledResponse(): HttpResponseBuilder">handledResponse(): HttpResponseBuilder</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">hash
+  <li><a class="reference" href="#hash%2CByteView" title="hash(v: ByteView): Hash">hash(v: ByteView): Hash</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">isTrustedProxyAddress
   <li><a class="reference" href="#isTrustedProxyAddress%2Cstring%2Cseq%5Bstring%5D" title="isTrustedProxyAddress(ip: string; cidrs: seq[string]): bool">isTrustedProxyAddress(ip: string; cidrs: seq[string]): bool</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">isValidHeaderName
-  <li><a class="reference" href="#isValidHeaderName%2Cstring" title="isValidHeaderName(name: string): bool">isValidHeaderName(name: string): bool</a></li>
+  <li><a class="reference" href="#isValidHeaderName%2CByteView" title="isValidHeaderName(name: ByteView): bool">isValidHeaderName(name: ByteView): bool</a></li>
+<li><a class="reference" href="#isValidHeaderName%2Cstring" title="isValidHeaderName(name: string): bool">isValidHeaderName(name: string): bool</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">isValidHeaderValue
-  <li><a class="reference" href="#isValidHeaderValue%2Cstring" title="isValidHeaderValue(value: string): bool">isValidHeaderValue(value: string): bool</a></li>
+  <li><a class="reference" href="#isValidHeaderValue%2CByteView" title="isValidHeaderValue(value: ByteView): bool">isValidHeaderValue(value: ByteView): bool</a></li>
+<li><a class="reference" href="#isValidHeaderValue%2Cstring" title="isValidHeaderValue(value: string): bool">isValidHeaderValue(value: string): bool</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">isValidLowercaseHeaderName
+  <li><a class="reference" href="#isValidLowercaseHeaderName%2Cstring" title="isValidLowercaseHeaderName(name: string): bool">isValidLowercaseHeaderName(name: string): bool</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">len
+  <li><a class="reference" href="#len%2CHttpHeadersView" title="len(headers: HttpHeadersView): int">len(headers: HttpHeadersView): int</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">newHttpServer
@@ -226,8 +302,19 @@
               trustedForwardedHeaders: bool = false): HttpServer</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">newOwnedRequest
+  <li><a class="reference" href="#newOwnedRequest%2Cstring%2Cstring%2Cseq%5B%5D%2Cstring%2Cstring%2Cstring%2Cstring" title="newOwnedRequest(meth, path: string; headers: seq[(string, string)] = @[];
+                body: string = &quot;&quot;; httpVersion: string = &quot;HTTP/1.1&quot;;
+                authority: string = &quot;&quot;; scheme: string = &quot;&quot;): HttpRequest">newOwnedRequest(meth, path: string; headers: seq[(string, string)] = @[];
+                body: string = &quot;&quot;; httpVersion: string = &quot;HTTP/1.1&quot;;
+                authority: string = &quot;&quot;; scheme: string = &quot;&quot;): HttpRequest</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">newResponse
-  <li><a class="reference" href="#newResponse%2Cint%2Cstring%2Cseq%5B%5D" title="newResponse(statusCode: int; body: string = &quot;&quot;;
+  <li><a class="reference" href="#newResponse%2Cint%2CByteView%2Cseq%5B%5D" title="newResponse(statusCode: int; body: ByteView;
+            headers: seq[(string, string)] = @[]): HttpResponseBuilder">newResponse(statusCode: int; body: ByteView;
+            headers: seq[(string, string)] = @[]): HttpResponseBuilder</a></li>
+<li><a class="reference" href="#newResponse%2Cint%2Cstring%2Cseq%5B%5D" title="newResponse(statusCode: int; body: string = &quot;&quot;;
             headers: seq[(string, string)] = @[]): HttpResponseBuilder">newResponse(statusCode: int; body: string = &quot;&quot;;
             headers: seq[(string, string)] = @[]): HttpResponseBuilder</a></li>
 
@@ -244,6 +331,30 @@
   <li><a class="reference" href="#passRouteResponse%2Cseq%5B%5D" title="passRouteResponse(headers: seq[(string, string)] = @[]): HttpResponseBuilder">passRouteResponse(headers: seq[(string, string)] = @[]): HttpResponseBuilder</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">rawHttp1Headers
+  <li><a class="reference" href="#rawHttp1Headers%2CByteView%2Cint" title="rawHttp1Headers(raw: ByteView; count: int): HttpHeadersView">rawHttp1Headers(raw: ByteView; count: int): HttpHeadersView</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">setBody
+  <li><a class="reference" href="#setBody%2CHttpResponseBuilder%2Csinkstring" title="setBody(resp: var HttpResponseBuilder; body: sink string)">setBody(resp: var HttpResponseBuilder; body: sink string)</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">setBodyStorage
+  <li><a class="reference" href="#setBodyStorage%2CHttpRequest%2Csinkstring" title="setBodyStorage(req: var HttpRequest; value: sink string)">setBodyStorage(req: var HttpRequest; value: sink string)</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">setMethod
+  <li><a class="reference" href="#setMethod%2CHttpRequest%2Csinkstring" title="setMethod(req: var HttpRequest; value: sink string)">setMethod(req: var HttpRequest; value: sink string)</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">sharedHeaders
+  <li><a class="reference" href="#sharedHeaders%2CopenArray%5B%5D" title="sharedHeaders(pairs: openArray[(string, string)]): HttpHeadersView">sharedHeaders(pairs: openArray[(string, string)]): HttpHeadersView</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">startsWith
+  <li><a class="reference" href="#startsWith%2CByteView%2Cstring" title="startsWith(v: ByteView; prefix: string): bool">startsWith(v: ByteView; prefix: string): bool</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">statusMessage
   <li><a class="reference" href="#statusMessage%2Cint" title="statusMessage(code: int): string">statusMessage(code: int): string</a></li>
 
@@ -252,12 +363,41 @@
   <li><a class="reference" href="#stop%2CHttpServer" title="stop(server: HttpServer)">stop(server: HttpServer)</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">toString
+  <li><a class="reference" href="#toString%2CByteView" title="toString(v: ByteView): string">toString(v: ByteView): string</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">validateHeaderPair
-  <li><a class="reference" href="#validateHeaderPair%2Cstring%2Cstring" title="validateHeaderPair(name, value: string): bool">validateHeaderPair(name, value: string): bool</a></li>
+  <li><a class="reference" href="#validateHeaderPair%2CByteView%2CByteView" title="validateHeaderPair(name, value: ByteView): bool">validateHeaderPair(name, value: ByteView): bool</a></li>
+<li><a class="reference" href="#validateHeaderPair%2Cstring%2Cstring" title="validateHeaderPair(name, value: string): bool">validateHeaderPair(name, value: string): bool</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">validateResponseHeaders
   <li><a class="reference" href="#validateResponseHeaders%2Cseq%5B%5D" title="validateResponseHeaders(headers: seq[(string, string)]): bool">validateResponseHeaders(headers: seq[(string, string)]): bool</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">view
+  <li><a class="reference" href="#view%2CopenArray%5Bbyte%5D" title="view(bytes: openArray[byte]): ByteView">view(bytes: openArray[byte]): ByteView</a></li>
+<li><a class="reference" href="#view%2Cptr.UncheckedArray%5Bchar%5D%2Cint" title="view(data: ptr UncheckedArray[char]; len: int): ByteView">view(data: ptr UncheckedArray[char]; len: int): ByteView</a></li>
+<li><a class="reference" href="#view%2Cptr.UncheckedArray%5Bchar%5D%2Cint%2Cint" title="view(data: ptr UncheckedArray[char]; start, len: int): ByteView">view(data: ptr UncheckedArray[char]; start, len: int): ByteView</a></li>
+<li><a class="reference" href="#view%2CopenArray%5Bchar%5D" title="view(s: openArray[char]): ByteView">view(s: openArray[char]): ByteView</a></li>
+
+</ul>
+
+    </ul>
+  </details>
+</li>
+<li>
+  <details open>
+    <summary><a class="reference reference-toplevel" href="#15" id="65">Iterators</a></summary>
+    <ul class="simple simple-toc-section">
+      <ul class="simple nested-toc-section">items
+  <li><a class="reference" href="#items.i%2CHttpHeadersView" title="items(headers: HttpHeadersView): HttpHeaderView">items(headers: HttpHeadersView): HttpHeaderView</a></li>
+<li><a class="reference" href="#items.i%2CByteView" title="items(v: ByteView): char">items(v: ByteView): char</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">pairs
+  <li><a class="reference" href="#pairs.i%2CByteView" title="pairs(v: ByteView): (int, char)">pairs(v: ByteView): (int, char)</a></li>
 
 </ul>
 
@@ -274,12 +414,41 @@
     
     <p class="module-desc"><p>HTTP Server Types</p>
 <p>Core types for the HTTP server: HttpRequest, HttpResponseBuilder, HttpHandler, HttpServerConfig, HttpServer.</p>
-</p>
+Borrow a decoder-owned header field sequence.</p>
     <div class="section" id="7">
   <h1><a class="toc-backref" href="#7">Types</a></h1>
   <dl class="item">
-    <div id="HttpHandler">
+    <div id="ByteView">
+  <dt><pre><a href="types.html#ByteView"><span class="Identifier">ByteView</span></a> <span class="Other">=</span> <span class="Keyword">object</span>
+  <span class="Identifier">data</span><span class="Operator">*</span><span class="Other">:</span> <span class="Keyword">ptr</span> <span class="Identifier">UncheckedArray</span><span class="Other">[</span><span class="Identifier">char</span><span class="Other">]</span>
+  <span class="Identifier">len</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int</span></pre></dt>
+  <dd>
+    
+    Ephemeral, non-owning view over request bytes. The view is valid only while the request handler is running. Call <tt class="docutils literal"><span class="pre"><span class="Identifier">toString</span></span></tt> to retain it.
+    
+  </dd>
+</div>
+<div id="HttpHandler">
   <dt><pre><a href="types.html#HttpHandler"><span class="Identifier">HttpHandler</span></a> <span class="Other">=</span> <span class="Keyword">proc</span> <span class="Other">(</span><span class="Identifier">req</span><span class="Other">:</span> <a href="types.html#HttpRequest"><span class="Identifier">HttpRequest</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">CpsFuture</span><span class="Other">[</span><a href="types.html#HttpResponseBuilder"><span class="Identifier">HttpResponseBuilder</span></a><span class="Other">]</span> {.<span class="Identifier">closure</span>.}</pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+<div id="HttpHeadersView">
+  <dt><pre><a href="types.html#HttpHeadersView"><span class="Identifier">HttpHeadersView</span></a> <span class="Other">=</span> <span class="Keyword">object</span>
+  <span class="Keyword">case</span>
+  <span class="Keyword">of</span> <span class="Identifier">hhsRawHttp1</span><span class="Other">:</span>
+  <span class="Keyword">of</span> <span class="Identifier">hhsPairs</span><span class="Other">:</span></pre></dt>
+  <dd>
+    
+    Allocation-free request-header view. HTTP/1 headers are scanned from the wire buffer; HTTP/2 and HTTP/3 share their decoder-owned field list.
+    
+  </dd>
+</div>
+<div id="HttpHeaderView">
+  <dt><pre><a href="types.html#HttpHeaderView"><span class="Identifier">HttpHeaderView</span></a> <span class="Other">=</span> <span class="Keyword">tuple</span><span class="Other">[</span><span class="Identifier">name</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">,</span> <span class="Identifier">value</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">]</span></pre></dt>
   <dd>
     
     
@@ -288,23 +457,25 @@
 </div>
 <div id="HttpRequest">
   <dt><pre><a href="types.html#HttpRequest"><span class="Identifier">HttpRequest</span></a> <span class="Other">=</span> <span class="Keyword">object</span>
-  <span class="Identifier">meth</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
-  <span class="Identifier">path</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
-  <span class="Identifier">httpVersion</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
-  <span class="Identifier">headers</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Other">(</span><span class="Identifier">string</span><span class="Other">,</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">]</span>
-  <span class="Identifier">body</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
+  <span class="Identifier">meth</span><span class="Operator">*</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a>
+  <span class="Identifier">path</span><span class="Operator">*</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a>
+  <span class="Identifier">httpVersion</span><span class="Operator">*</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a>
+  <span class="Identifier">headers</span><span class="Operator">*</span><span class="Other">:</span> <a href="types.html#HttpHeadersView"><span class="Identifier">HttpHeadersView</span></a>
+  <span class="Identifier">body</span><span class="Operator">*</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a>
   <span class="Identifier">remoteAddr</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>        <span class="Comment">## Remote peer IP address.</span>
   <span class="Identifier">streamId</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">uint32</span>          <span class="Comment">## HTTP/2 stream ID (0 for HTTP/1.1)</span>
-  <span class="Identifier">authority</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>         <span class="Comment">## HTTP/2 :authority pseudo-header</span>
-  <span class="Identifier">scheme</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>            <span class="Comment">## HTTP/2 :scheme pseudo-header</span>
+  <span class="Identifier">authority</span><span class="Operator">*</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a>       <span class="Comment">## HTTP/2 :authority pseudo-header</span>
+  <span class="Identifier">scheme</span><span class="Operator">*</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a>          <span class="Comment">## HTTP/2 :scheme pseudo-header</span>
   <span class="Identifier">stream</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">AsyncStream</span>       <span class="Comment">## Underlying transport (for SSE/WebSocket). nil for HTTP/2.</span>
   <span class="Identifier">reader</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">BufferedReader</span>    <span class="Comment">## HTTP/1.1 buffered reader (for WebSocket). nil for HTTP/2.</span>
   <span class="Identifier">templateRenderer</span><span class="Operator">*</span><span class="Other">:</span> <a href="types.html#TemplateRenderer"><span class="Identifier">TemplateRenderer</span></a> <span class="Comment">## Router-scoped template renderer (if configured).</span>
   <span class="Identifier">context</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">TableRef</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">,</span> <span class="Identifier">string</span><span class="Other">]</span> <span class="Comment">## Shared per-request context across request copies</span>
-  <span class="Identifier">appState</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">RootRef</span>         <span class="Comment">## Typed app state injected by router dispatch</span></pre></dt>
+  <span class="Identifier">appState</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">RootRef</span>         <span class="Comment">## Typed app state injected by router dispatch</span>
+  <span class="Identifier">maxWsFrameBytes</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int</span>      <span class="Comment">## Per-request WebSocket frame limit inherited from the server.</span>
+  <span class="Identifier">maxWsMessageBytes</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int</span>    <span class="Comment">## Per-request WebSocket message limit inherited from the server.</span></pre></dt>
   <dd>
     
-    
+    Parsed request data is borrowed. It must not escape the handler unless explicitly copied with <tt class="docutils literal"><span class="pre"><span class="Identifier">toString</span></span></tt>/<tt class="docutils literal"><span class="pre"><span class="Identifier">toSeq</span></span></tt>.
     
   </dd>
 </div>
@@ -312,7 +483,7 @@
   <dt><pre><a href="types.html#HttpResponseBuilder"><span class="Identifier">HttpResponseBuilder</span></a> <span class="Other">=</span> <span class="Keyword">object</span>
   <span class="Identifier">statusCode</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int</span>
   <span class="Identifier">headers</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Other">(</span><span class="Identifier">string</span><span class="Other">,</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">]</span>
-  <span class="Identifier">body</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
+  <span class="Identifier">body</span><span class="Operator">*</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a>
   <span class="Identifier">control</span><span class="Operator">*</span><span class="Other">:</span> <a href="types.html#ResponseControl"><span class="Identifier">ResponseControl</span></a></pre></dt>
   <dd>
     
@@ -328,6 +499,7 @@
   <span class="Identifier">running</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
   <span class="Identifier">boundPort</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int</span>
   <span class="Identifier">connGroup</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">TaskGroup</span>
+  <span class="Identifier">acceptStopSignal</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">CpsVoidFuture</span>
   <span class="Identifier">shutdownStarted</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
   <span class="Identifier">onStartCallbacks</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Keyword">proc</span> <span class="Other">(</span><span class="Other">)</span><span class="Other">]</span>
   <span class="Identifier">onShutdownCallbacks</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Keyword">proc</span> <span class="Other">(</span><span class="Other">)</span><span class="Other">]</span></pre></dt>
@@ -404,13 +576,187 @@
 <div class="section" id="12">
   <h1><a class="toc-backref" href="#12">Procs</a></h1>
   <dl class="item">
-    <div id="bindAndListen-procs-all">
+    <div id="!=-procs-all">
+  <div id="!=,ByteView,string">
+  <dt><pre><span class="Keyword">proc</span> <a href="#%21%3D%2CByteView%2Cstring"><span class="Identifier">`!=`</span></a><span class="Other">(</span><span class="Identifier">a</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">;</span> <span class="Identifier">b</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Return whether a byte view differs from a string.
+    
+  </dd>
+</div>
+<div id="!=,string,ByteView">
+  <dt><pre><span class="Keyword">proc</span> <a href="#%21%3D%2Cstring%2CByteView"><span class="Identifier">`!=`</span></a><span class="Other">(</span><span class="Identifier">a</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">b</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Return whether a string differs from a byte view.
+    
+  </dd>
+</div>
+
+</div>
+<div id="$-procs-all">
+  <div id="$,ByteView">
+  <dt><pre><span class="Keyword">proc</span> <a href="#%24%2CByteView"><span class="Identifier">`$`</span></a><span class="Other">(</span><span class="Identifier">v</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Materialize a borrowed view as an owned string.
+    
+  </dd>
+</div>
+
+</div>
+<div id="%-procs-all">
+  <div id="%,ByteView">
+  <dt><pre><span class="Keyword">proc</span> <a href="#%25%2CByteView"><span class="Identifier">`%`</span></a><span class="Other">(</span><span class="Identifier">v</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">JsonNode</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Materialize only when an owning JSON string node is requested.
+    
+  </dd>
+</div>
+
+</div>
+<div id="&amp;-procs-all">
+  <div id="&,ByteView,string">
+  <dt><pre><span class="Keyword">proc</span> <a href="#%26%2CByteView%2Cstring"><span class="Identifier">`&amp;`</span></a><span class="Other">(</span><span class="Identifier">a</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">;</span> <span class="Identifier">b</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Concatenate a borrowed view and owned string into new storage.
+    
+  </dd>
+</div>
+<div id="&,string,ByteView">
+  <dt><pre><span class="Keyword">proc</span> <a href="#%26%2Cstring%2CByteView"><span class="Identifier">`&amp;`</span></a><span class="Other">(</span><span class="Identifier">a</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">b</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Concatenate an owned string and borrowed view into new storage.
+    
+  </dd>
+</div>
+
+</div>
+<div id="==-procs-all">
+  <div id="==,ByteView,ByteView">
+  <dt><pre><span class="Keyword">proc</span> <a href="#%3D%3D%2CByteView%2CByteView"><span class="Identifier">`==`</span></a><span class="Other">(</span><span class="Identifier">a</span><span class="Other">,</span> <span class="Identifier">b</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Compare two byte views without allocating.
+    
+  </dd>
+</div>
+<div id="==,ByteView,string">
+  <dt><pre><span class="Keyword">proc</span> <a href="#%3D%3D%2CByteView%2Cstring"><span class="Identifier">`==`</span></a><span class="Other">(</span><span class="Identifier">a</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">;</span> <span class="Identifier">b</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Compare a byte view with a string without materializing the view.
+    
+  </dd>
+</div>
+<div id="==,string,ByteView">
+  <dt><pre><span class="Keyword">proc</span> <a href="#%3D%3D%2Cstring%2CByteView"><span class="Identifier">`==`</span></a><span class="Other">(</span><span class="Identifier">a</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">b</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Compare a string with a byte view without materializing the view.
+    
+  </dd>
+</div>
+
+</div>
+<div id="[]-procs-all">
+  <div id="[],HttpHeadersView,int">
+  <dt><pre><span class="Keyword">proc</span> <a href="#%5B%5D%2CHttpHeadersView%2Cint"><span class="Identifier">`[]`</span></a><span class="Other">(</span><span class="Identifier">headers</span><span class="Other">:</span> <a href="types.html#HttpHeadersView"><span class="Identifier">HttpHeadersView</span></a><span class="Other">;</span> <span class="Identifier">index</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span> <a href="types.html#HttpHeaderView"><span class="Identifier">HttpHeaderView</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Return the visible header at <tt class="docutils literal"><span class="pre"><span class="Identifier">index</span></span></tt> as borrowed views.
+    
+  </dd>
+</div>
+<div id="[],ByteView,BackwardsIndex">
+  <dt><pre><span class="Keyword">proc</span> <a href="#%5B%5D%2CByteView%2CBackwardsIndex"><span class="Identifier">`[]`</span></a><span class="Other">(</span><span class="Identifier">v</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">;</span> <span class="Identifier">i</span><span class="Other">:</span> <span class="Identifier">BackwardsIndex</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">char</span> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Return a character indexed from the end of the borrowed view.
+    
+  </dd>
+</div>
+<div id="[],ByteView,int">
+  <dt><pre><span class="Keyword">proc</span> <a href="#%5B%5D%2CByteView%2Cint"><span class="Identifier">`[]`</span></a><span class="Other">(</span><span class="Identifier">v</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">;</span> <span class="Identifier">i</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">char</span> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Return the character at <tt class="docutils literal"><span class="pre"><span class="Identifier">i</span></span></tt> without bounds or ownership conversion.
+    
+  </dd>
+</div>
+<div id="[],ByteView,HSlice[int,BackwardsIndex]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#%5B%5D%2CByteView%2CHSlice%5Bint%2CBackwardsIndex%5D"><span class="Identifier">`[]`</span></a><span class="Other">(</span><span class="Identifier">v</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">;</span> <span class="Identifier">slice</span><span class="Other">:</span> <span class="Identifier">HSlice</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">,</span> <span class="Identifier">BackwardsIndex</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a> {.<span class="Identifier">inline</span><span class="Other">,</span>
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Borrow a slice whose upper bound is indexed from the end.
+    
+  </dd>
+</div>
+<div id="[],ByteView,HSlice[int,int]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#%5B%5D%2CByteView%2CHSlice%5Bint%2Cint%5D"><span class="Identifier">`[]`</span></a><span class="Other">(</span><span class="Identifier">v</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">;</span> <span class="Identifier">slice</span><span class="Other">:</span> <span class="Identifier">HSlice</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">,</span> <span class="Identifier">int</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Borrow an inclusive forward-indexed slice.
+    
+  </dd>
+</div>
+
+</div>
+<div id="bindAndListen-procs-all">
   <div id="bindAndListen,HttpServer">
   <dt><pre><span class="Keyword">proc</span> <a href="#bindAndListen%2CHttpServer"><span class="Identifier">bindAndListen</span></a><span class="Other">(</span><span class="Identifier">server</span><span class="Other">:</span> <a href="types.html#HttpServer"><span class="Identifier">HttpServer</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">AsyncIoError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">]</span><span class="Other">,</span>
     <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Bind and listen. Call before start().
+    
+  </dd>
+</div>
+
+</div>
+<div id="clearBody-procs-all">
+  <div id="clearBody,HttpResponseBuilder">
+  <dt><pre><span class="Keyword">proc</span> <a href="#clearBody%2CHttpResponseBuilder"><span class="Identifier">clearBody</span></a><span class="Other">(</span><span class="Identifier">resp</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="types.html#HttpResponseBuilder"><span class="Identifier">HttpResponseBuilder</span></a><span class="Other">)</span> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Remove response body storage and reset its borrowed view.
+    
+  </dd>
+</div>
+
+</div>
+<div id="cmpIgnoreCase-procs-all">
+  <div id="cmpIgnoreCase,ByteView,string">
+  <dt><pre><span class="Keyword">proc</span> <a href="#cmpIgnoreCase%2CByteView%2Cstring"><span class="Identifier">cmpIgnoreCase</span></a><span class="Other">(</span><span class="Identifier">a</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">;</span> <span class="Identifier">b</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Compare borrowed bytes with a string using ASCII case folding.
+    
+  </dd>
+</div>
+
+</div>
+<div id="contains-procs-all">
+  <div id="contains,ByteView,string">
+  <dt><pre><span class="Keyword">proc</span> <a href="#contains%2CByteView%2Cstring"><span class="Identifier">contains</span></a><span class="Other">(</span><span class="Identifier">v</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">;</span> <span class="Identifier">needle</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Return whether a borrowed view contains <tt class="docutils literal"><span class="pre"><span class="Identifier">needle</span></span></tt>.
     
   </dd>
 </div>
@@ -440,7 +786,16 @@
 
 </div>
 <div id="eqCaseInsensitive-procs-all">
-  <div id="eqCaseInsensitive,string,string">
+  <div id="eqCaseInsensitive,ByteView,ByteView">
+  <dt><pre><span class="Keyword">proc</span> <a href="#eqCaseInsensitive%2CByteView%2CByteView"><span class="Identifier">eqCaseInsensitive</span></a><span class="Other">(</span><span class="Identifier">a</span><span class="Other">,</span> <span class="Identifier">b</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Test two borrowed views for ASCII case-insensitive equality.
+    
+  </dd>
+</div>
+<div id="eqCaseInsensitive,string,string">
   <dt><pre><span class="Keyword">proc</span> <a href="#eqCaseInsensitive%2Cstring%2Cstring"><span class="Identifier">eqCaseInsensitive</span></a><span class="Other">(</span><span class="Identifier">a</span><span class="Other">,</span> <span class="Identifier">b</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
     <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
@@ -449,11 +804,41 @@
     
   </dd>
 </div>
+<div id="eqCaseInsensitive,ByteView,string">
+  <dt><pre><span class="Keyword">proc</span> <a href="#eqCaseInsensitive%2CByteView%2Cstring"><span class="Identifier">eqCaseInsensitive</span></a><span class="Other">(</span><span class="Identifier">a</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">;</span> <span class="Identifier">b</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Test borrowed bytes and a string for ASCII case-insensitive equality.
+    
+  </dd>
+</div>
+
+</div>
+<div id="find-procs-all">
+  <div id="find,ByteView,char,int">
+  <dt><pre><span class="Keyword">proc</span> <a href="#find%2CByteView%2Cchar%2Cint"><span class="Identifier">find</span></a><span class="Other">(</span><span class="Identifier">v</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">;</span> <span class="Identifier">needle</span><span class="Other">:</span> <span class="Identifier">char</span><span class="Other">;</span> <span class="Identifier">start</span> <span class="Other">=</span> <span class="DecNumber">0</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Find a character without materializing the borrowed view.
+    
+  </dd>
+</div>
+<div id="find,ByteView,string,int">
+  <dt><pre><span class="Keyword">proc</span> <a href="#find%2CByteView%2Cstring%2Cint"><span class="Identifier">find</span></a><span class="Other">(</span><span class="Identifier">v</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">;</span> <span class="Identifier">needle</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">start</span> <span class="Other">=</span> <span class="DecNumber">0</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Find a string without materializing the borrowed view.
+    
+  </dd>
+</div>
 
 </div>
 <div id="getHeader-procs-all">
   <div id="getHeader,HttpRequest,string">
-  <dt><pre><span class="Keyword">proc</span> <a href="#getHeader%2CHttpRequest%2Cstring"><span class="Identifier">getHeader</span></a><span class="Other">(</span><span class="Identifier">req</span><span class="Other">:</span> <a href="types.html#HttpRequest"><span class="Identifier">HttpRequest</span></a><span class="Other">;</span> <span class="Identifier">name</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+  <dt><pre><span class="Keyword">proc</span> <a href="#getHeader%2CHttpRequest%2Cstring"><span class="Identifier">getHeader</span></a><span class="Other">(</span><span class="Identifier">req</span><span class="Other">:</span> <a href="types.html#HttpRequest"><span class="Identifier">HttpRequest</span></a><span class="Other">;</span> <span class="Identifier">name</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
     <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
@@ -497,6 +882,17 @@
 </div>
 
 </div>
+<div id="hash-procs-all">
+  <div id="hash,ByteView">
+  <dt><pre><span class="Keyword">proc</span> <a href="#hash%2CByteView"><span class="Identifier">hash</span></a><span class="Other">(</span><span class="Identifier">v</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">Hash</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Hash borrowed bytes using the same character-wise combination semantics.
+    
+  </dd>
+</div>
+
+</div>
 <div id="isTrustedProxyAddress-procs-all">
   <div id="isTrustedProxyAddress,string,seq[string]">
   <dt><pre><span class="Keyword">proc</span> <a href="#isTrustedProxyAddress%2Cstring%2Cseq%5Bstring%5D"><span class="Identifier">isTrustedProxyAddress</span></a><span class="Other">(</span><span class="Identifier">ip</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">cidrs</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
@@ -510,7 +906,15 @@
 
 </div>
 <div id="isValidHeaderName-procs-all">
-  <div id="isValidHeaderName,string">
+  <div id="isValidHeaderName,ByteView">
+  <dt><pre><span class="Keyword">proc</span> <a href="#isValidHeaderName%2CByteView"><span class="Identifier">isValidHeaderName</span></a><span class="Other">(</span><span class="Identifier">name</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Validate a borrowed header name as an RFC token.
+    
+  </dd>
+</div>
+<div id="isValidHeaderName,string">
   <dt><pre><span class="Keyword">proc</span> <a href="#isValidHeaderName%2Cstring"><span class="Identifier">isValidHeaderName</span></a><span class="Other">(</span><span class="Identifier">name</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
@@ -521,11 +925,44 @@
 
 </div>
 <div id="isValidHeaderValue-procs-all">
-  <div id="isValidHeaderValue,string">
+  <div id="isValidHeaderValue,ByteView">
+  <dt><pre><span class="Keyword">proc</span> <a href="#isValidHeaderValue%2CByteView"><span class="Identifier">isValidHeaderValue</span></a><span class="Other">(</span><span class="Identifier">value</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Validate borrowed header bytes without materializing a string.
+    
+  </dd>
+</div>
+<div id="isValidHeaderValue,string">
   <dt><pre><span class="Keyword">proc</span> <a href="#isValidHeaderValue%2Cstring"><span class="Identifier">isValidHeaderValue</span></a><span class="Other">(</span><span class="Identifier">value</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Strict header value validation: rejects CR/LF and control chars (except HTAB).
+    
+  </dd>
+</div>
+
+</div>
+<div id="isValidLowercaseHeaderName-procs-all">
+  <div id="isValidLowercaseHeaderName,string">
+  <dt><pre><span class="Keyword">proc</span> <a href="#isValidLowercaseHeaderName%2Cstring"><span class="Identifier">isValidLowercaseHeaderName</span></a><span class="Other">(</span><span class="Identifier">name</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Validate the lowercase token form required on HTTP/2 and HTTP/3 wires.
+    
+  </dd>
+</div>
+
+</div>
+<div id="len-procs-all">
+  <div id="len,HttpHeadersView">
+  <dt><pre><span class="Keyword">proc</span> <a href="#len%2CHttpHeadersView"><span class="Identifier">len</span></a><span class="Other">(</span><span class="Identifier">headers</span><span class="Other">:</span> <a href="types.html#HttpHeadersView"><span class="Identifier">HttpHeadersView</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Return the number of visible, non-pseudo header fields.
     
   </dd>
 </div>
@@ -567,8 +1004,32 @@
 </div>
 
 </div>
+<div id="newOwnedRequest-procs-all">
+  <div id="newOwnedRequest,string,string,seq[],string,string,string,string">
+  <dt><pre><span class="Keyword">proc</span> <a href="#newOwnedRequest%2Cstring%2Cstring%2Cseq%5B%5D%2Cstring%2Cstring%2Cstring%2Cstring"><span class="Identifier">newOwnedRequest</span></a><span class="Other">(</span><span class="Identifier">meth</span><span class="Other">,</span> <span class="Identifier">path</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">headers</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Other">(</span><span class="Identifier">string</span><span class="Other">,</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">]</span> <span class="Other">=</span> <span class="Operator">@</span><span class="Other">[</span><span class="Other">]</span><span class="Other">;</span>
+                     <span class="Identifier">body</span><span class="Other">:</span> <span class="Identifier">string</span> <span class="Other">=</span> <span class="StringLit">&quot;&quot;</span><span class="Other">;</span> <span class="Identifier">httpVersion</span><span class="Other">:</span> <span class="Identifier">string</span> <span class="Other">=</span> <span class="StringLit">&quot;HTTP/1.1&quot;</span><span class="Other">;</span>
+                     <span class="Identifier">authority</span><span class="Other">:</span> <span class="Identifier">string</span> <span class="Other">=</span> <span class="StringLit">&quot;&quot;</span><span class="Other">;</span> <span class="Identifier">scheme</span><span class="Other">:</span> <span class="Identifier">string</span> <span class="Other">=</span> <span class="StringLit">&quot;&quot;</span><span class="Other">)</span><span class="Other">:</span> <a href="types.html#HttpRequest"><span class="Identifier">HttpRequest</span></a> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Construct a request whose byte views remain valid for the request value's lifetime. Network servers use borrowed transport storage instead.
+    
+  </dd>
+</div>
+
+</div>
 <div id="newResponse-procs-all">
-  <div id="newResponse,int,string,seq[]">
+  <div id="newResponse,int,ByteView,seq[]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#newResponse%2Cint%2CByteView%2Cseq%5B%5D"><span class="Identifier">newResponse</span></a><span class="Other">(</span><span class="Identifier">statusCode</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">;</span> <span class="Identifier">body</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">;</span>
+                 <span class="Identifier">headers</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Other">(</span><span class="Identifier">string</span><span class="Other">,</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">]</span> <span class="Other">=</span> <span class="Operator">@</span><span class="Other">[</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <a href="types.html#HttpResponseBuilder"><span class="Identifier">HttpResponseBuilder</span></a> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Create a response that borrows its body through write completion.
+    
+  </dd>
+</div>
+<div id="newResponse,int,string,seq[]">
   <dt><pre><span class="Keyword">proc</span> <a href="#newResponse%2Cint%2Cstring%2Cseq%5B%5D"><span class="Identifier">newResponse</span></a><span class="Other">(</span><span class="Identifier">statusCode</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">;</span> <span class="Identifier">body</span><span class="Other">:</span> <span class="Identifier">string</span> <span class="Other">=</span> <span class="StringLit">&quot;&quot;</span><span class="Other">;</span>
                  <span class="Identifier">headers</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Other">(</span><span class="Identifier">string</span><span class="Other">,</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">]</span> <span class="Other">=</span> <span class="Operator">@</span><span class="Other">[</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <a href="types.html#HttpResponseBuilder"><span class="Identifier">HttpResponseBuilder</span></a> {.
     <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
@@ -616,6 +1077,78 @@
 </div>
 
 </div>
+<div id="rawHttp1Headers-procs-all">
+  <div id="rawHttp1Headers,ByteView,int">
+  <dt><pre><span class="Keyword">proc</span> <a href="#rawHttp1Headers%2CByteView%2Cint"><span class="Identifier">rawHttp1Headers</span></a><span class="Other">(</span><span class="Identifier">raw</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">;</span> <span class="Identifier">count</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span> <a href="types.html#HttpHeadersView"><span class="Identifier">HttpHeadersView</span></a> {.<span class="Identifier">inline</span><span class="Other">,</span>
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Construct a header view over an HTTP/1 wire block.
+    
+  </dd>
+</div>
+
+</div>
+<div id="setBody-procs-all">
+  <div id="setBody,HttpResponseBuilder,sinkstring">
+  <dt><pre><span class="Keyword">proc</span> <a href="#setBody%2CHttpResponseBuilder%2Csinkstring"><span class="Identifier">setBody</span></a><span class="Other">(</span><span class="Identifier">resp</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="types.html#HttpResponseBuilder"><span class="Identifier">HttpResponseBuilder</span></a><span class="Other">;</span> <span class="Identifier">body</span><span class="Other">:</span> <span class="Identifier">sink</span> <span class="Identifier">string</span><span class="Other">)</span> {.<span class="Identifier">inline</span><span class="Other">,</span>
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Replace a response body with owned storage and refresh its view.
+    
+  </dd>
+</div>
+
+</div>
+<div id="setBodyStorage-procs-all">
+  <div id="setBodyStorage,HttpRequest,sinkstring">
+  <dt><pre><span class="Keyword">proc</span> <a href="#setBodyStorage%2CHttpRequest%2Csinkstring"><span class="Identifier">setBodyStorage</span></a><span class="Other">(</span><span class="Identifier">req</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="types.html#HttpRequest"><span class="Identifier">HttpRequest</span></a><span class="Other">;</span> <span class="Identifier">value</span><span class="Other">:</span> <span class="Identifier">sink</span> <span class="Identifier">string</span><span class="Other">)</span> {.<span class="Identifier">inline</span><span class="Other">,</span>
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Retain an owned decoder body while exposing it through a byte view.
+    
+  </dd>
+</div>
+
+</div>
+<div id="setMethod-procs-all">
+  <div id="setMethod,HttpRequest,sinkstring">
+  <dt><pre><span class="Keyword">proc</span> <a href="#setMethod%2CHttpRequest%2Csinkstring"><span class="Identifier">setMethod</span></a><span class="Other">(</span><span class="Identifier">req</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="types.html#HttpRequest"><span class="Identifier">HttpRequest</span></a><span class="Other">;</span> <span class="Identifier">value</span><span class="Other">:</span> <span class="Identifier">sink</span> <span class="Identifier">string</span><span class="Other">)</span> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Replace the borrowed method with request-owned storage.
+    
+  </dd>
+</div>
+
+</div>
+<div id="sharedHeaders-procs-all">
+  <div id="sharedHeaders,openArray[]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#sharedHeaders%2CopenArray%5B%5D"><span class="Identifier">sharedHeaders</span></a><span class="Other">(</span><span class="Identifier">pairs</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Other">(</span><span class="Identifier">string</span><span class="Other">,</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <a href="types.html#HttpHeadersView"><span class="Identifier">HttpHeadersView</span></a> {.
+    <span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
+</div>
+<div id="startsWith-procs-all">
+  <div id="startsWith,ByteView,string">
+  <dt><pre><span class="Keyword">proc</span> <a href="#startsWith%2CByteView%2Cstring"><span class="Identifier">startsWith</span></a><span class="Other">(</span><span class="Identifier">v</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">;</span> <span class="Identifier">prefix</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Test whether a borrowed view starts with <tt class="docutils literal"><span class="pre"><span class="Identifier">prefix</span></span></tt>.
+    
+  </dd>
+</div>
+
+</div>
 <div id="statusMessage-procs-all">
   <div id="statusMessage,int">
   <dt><pre><span class="Keyword">proc</span> <a href="#statusMessage%2Cint"><span class="Identifier">statusMessage</span></a><span class="Other">(</span><span class="Identifier">code</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
@@ -629,17 +1162,38 @@
 </div>
 <div id="stop-procs-all">
   <div id="stop,HttpServer">
-  <dt><pre><span class="Keyword">proc</span> <a href="#stop%2CHttpServer"><span class="Identifier">stop</span></a><span class="Other">(</span><span class="Identifier">server</span><span class="Other">:</span> <a href="types.html#HttpServer"><span class="Identifier">HttpServer</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dt><pre><span class="Keyword">proc</span> <a href="#stop%2CHttpServer"><span class="Identifier">stop</span></a><span class="Other">(</span><span class="Identifier">server</span><span class="Other">:</span> <a href="types.html#HttpServer"><span class="Identifier">HttpServer</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span>
+                                <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
-    Stop types and wake any pending work.
+    Stop accepting and wake the server lifecycle task.
+    
+  </dd>
+</div>
+
+</div>
+<div id="toString-procs-all">
+  <div id="toString,ByteView">
+  <dt><pre><span class="Keyword">proc</span> <a href="#toString%2CByteView"><span class="Identifier">toString</span></a><span class="Other">(</span><span class="Identifier">v</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Materialize request bytes for storage beyond the handler lifetime.
     
   </dd>
 </div>
 
 </div>
 <div id="validateHeaderPair-procs-all">
-  <div id="validateHeaderPair,string,string">
+  <div id="validateHeaderPair,ByteView,ByteView">
+  <dt><pre><span class="Keyword">proc</span> <a href="#validateHeaderPair%2CByteView%2CByteView"><span class="Identifier">validateHeaderPair</span></a><span class="Other">(</span><span class="Identifier">name</span><span class="Other">,</span> <span class="Identifier">value</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Validate a borrowed header name/value pair.
+    
+  </dd>
+</div>
+<div id="validateHeaderPair,string,string">
   <dt><pre><span class="Keyword">proc</span> <a href="#validateHeaderPair%2Cstring%2Cstring"><span class="Identifier">validateHeaderPair</span></a><span class="Other">(</span><span class="Identifier">name</span><span class="Other">,</span> <span class="Identifier">value</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
     <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
@@ -662,6 +1216,82 @@
 </div>
 
 </div>
+<div id="view-procs-all">
+  <div id="view,openArray[byte]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#view%2CopenArray%5Bbyte%5D"><span class="Identifier">view</span></a><span class="Other">(</span><span class="Identifier">bytes</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Identifier">byte</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Borrow a byte sequence's storage. The caller must keep it alive unchanged.
+    
+  </dd>
+</div>
+<div id="view,ptr.UncheckedArray[char],int">
+  <dt><pre><span class="Keyword">proc</span> <a href="#view%2Cptr.UncheckedArray%5Bchar%5D%2Cint"><span class="Identifier">view</span></a><span class="Other">(</span><span class="Identifier">data</span><span class="Other">:</span> <span class="Keyword">ptr</span> <span class="Identifier">UncheckedArray</span><span class="Other">[</span><span class="Identifier">char</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">len</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a> {.<span class="Identifier">inline</span><span class="Other">,</span>
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Borrow <tt class="docutils literal"><span class="pre"><span class="Identifier">len</span></span></tt> characters beginning at <tt class="docutils literal"><span class="pre"><span class="Identifier">data</span></span></tt>.
+    
+  </dd>
+</div>
+<div id="view,ptr.UncheckedArray[char],int,int">
+  <dt><pre><span class="Keyword">proc</span> <a href="#view%2Cptr.UncheckedArray%5Bchar%5D%2Cint%2Cint"><span class="Identifier">view</span></a><span class="Other">(</span><span class="Identifier">data</span><span class="Other">:</span> <span class="Keyword">ptr</span> <span class="Identifier">UncheckedArray</span><span class="Other">[</span><span class="Identifier">char</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">start</span><span class="Other">,</span> <span class="Identifier">len</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a> {.<span class="Identifier">inline</span><span class="Other">,</span>
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Borrow a subrange of pointer-backed character storage.
+    
+  </dd>
+</div>
+<div id="view,openArray[char]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#view%2CopenArray%5Bchar%5D"><span class="Identifier">view</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Identifier">char</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Borrow a string's storage. The caller must keep <tt class="docutils literal"><span class="pre"><span class="Identifier">s</span></span></tt> alive and unchanged.
+    
+  </dd>
+</div>
+
+</div>
+
+  </dl>
+</div>
+<div class="section" id="15">
+  <h1><a class="toc-backref" href="#15">Iterators</a></h1>
+  <dl class="item">
+    <div id="items-iterators-all">
+  <div id="items.i,HttpHeadersView">
+  <dt><pre><span class="Keyword">iterator</span> <a href="#items.i%2CHttpHeadersView"><span class="Identifier">items</span></a><span class="Other">(</span><span class="Identifier">headers</span><span class="Other">:</span> <a href="types.html#HttpHeadersView"><span class="Identifier">HttpHeadersView</span></a><span class="Other">)</span><span class="Other">:</span> <a href="types.html#HttpHeaderView"><span class="Identifier">HttpHeaderView</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Iterate visible headers as borrowed name/value views.
+    
+  </dd>
+</div>
+<div id="items.i,ByteView">
+  <dt><pre><span class="Keyword">iterator</span> <a href="#items.i%2CByteView"><span class="Identifier">items</span></a><span class="Other">(</span><span class="Identifier">v</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">char</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Iterate characters in a borrowed view without materializing a string.
+    
+  </dd>
+</div>
+
+</div>
+<div id="pairs-iterators-all">
+  <div id="pairs.i,ByteView">
+  <dt><pre><span class="Keyword">iterator</span> <a href="#pairs.i%2CByteView"><span class="Identifier">pairs</span></a><span class="Other">(</span><span class="Identifier">v</span><span class="Other">:</span> <a href="types.html#ByteView"><span class="Identifier">ByteView</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Other">(</span><span class="Identifier">int</span><span class="Other">,</span> <span class="Identifier">char</span><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Iterate borrowed characters together with their zero-based indexes.
+    
+  </dd>
+</div>
+
+</div>
 
   </dl>
 </div>
@@ -672,7 +1302,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-25 20:56:22 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-31 16:23:44 UTC</small>
       </div>
     </div>
   </div>

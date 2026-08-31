@@ -1645,6 +1645,23 @@ proc processRequestStreamData*(conn: Http3Connection,
     conn.clearRequestStreamState(streamId)
     conn.clearUniStreamState(streamId)
 
+proc processRequestStreamDataOwned*(conn: Http3Connection,
+                                    streamId: uint64,
+                                    payload: seq[byte],
+                                    allowInformationalHeaders: bool = false,
+                                    streamRole: Http3StreamRole = h3srRequest): seq[Http3Event] =
+  ## Parse owned stream bytes without copying them into an empty reassembly
+  ## buffer. Fragmented streams still append to their retained partial frame.
+  if payload.len > 0 and
+      (streamId notin conn.requestStreamBuffers or
+       conn.requestStreamBuffers[streamId].len == 0):
+    conn.setRequestStreamBuffer(streamId, payload)
+    const noBytes: array[0, byte] = []
+    return conn.processRequestStreamData(streamId, noBytes,
+      allowInformationalHeaders, streamRole)
+  conn.processRequestStreamData(streamId, payload,
+    allowInformationalHeaders, streamRole)
+
 proc clearRequestStreamState*(conn: Http3Connection, streamId: uint64) =
   ## Discard bookkeeping for a closed HTTP/3 request stream.
   if streamId in conn.qpackBlockedRequestStreams:

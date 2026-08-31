@@ -33,7 +33,7 @@ proc getListenerPort(listener: TcpListener): int =
   result = ntohs(localAddr.sin_port).int
 
 proc echoHandler(req: HttpRequest): CpsFuture[HttpResponseBuilder] {.cps.} =
-  return newResponse(200, req.body, @[("X-Method", req.meth)])
+  return newResponse(200, req.body, @[("X-Method", req.meth.toString())])
 
 proc helloHandler(req: HttpRequest): CpsFuture[HttpResponseBuilder] {.cps.} =
   return newResponse(200, "Hello, MT World!")
@@ -211,7 +211,7 @@ block testMtSpawnBlocking:
     )
 
   proc blockingHandler(req: HttpRequest): CpsFuture[HttpResponseBuilder] {.cps.} =
-    let upper = await blockingUppercase(req.body)
+    let upper = await blockingUppercase(req.body.toString())
     return newResponse(200, upper)
 
   proc serverTask(l: TcpListener, cfg: HttpServerConfig): CpsVoidFuture {.cps.} =

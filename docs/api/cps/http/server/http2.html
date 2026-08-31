@@ -79,7 +79,6 @@
   continuationStreamId*: uint32
   outboundQueue*: Deque[OutboundWrite]
   writerRunning*: bool
-  writerWake*: CpsVoidFuture
   writerError*: ref CatchableError
   connectionWindowWaiters*: seq[CpsVoidFuture]
   shutdownFlag*: ptr bool
@@ -159,11 +158,11 @@
 
 </ul>
 <ul class="simple nested-toc-section">sendResponseHeaders
-  <li><a class="reference" href="#sendResponseHeaders%2CHttp2ServerConnection%2Cuint32%2Cint%2Cseq%5B%5D%2Cbool" title="sendResponseHeaders(conn: Http2ServerConnection; streamId: uint32;
+  <li><a class="reference" href="#sendResponseHeaders%2CHttp2ServerConnection%2Cuint32%2Cint%2Cseq%5B%5D%2Cbool%2Cint" title="sendResponseHeaders(conn: Http2ServerConnection; streamId: uint32;
                     statusCode: int; headers: seq[(string, string)];
-                    endStream: bool): CpsVoidFuture">sendResponseHeaders(conn: Http2ServerConnection; streamId: uint32;
+                    endStream: bool; contentLengthHint: int = -1): CpsVoidFuture">sendResponseHeaders(conn: Http2ServerConnection; streamId: uint32;
                     statusCode: int; headers: seq[(string, string)];
-                    endStream: bool): CpsVoidFuture</a></li>
+                    endStream: bool; contentLengthHint: int = -1): CpsVoidFuture</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">sendServerSettings
@@ -216,7 +215,6 @@ Send go away through the active transport.</p>
   <span class="Identifier">continuationStreamId</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">uint32</span>
   <span class="Identifier">outboundQueue</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">Deque</span><span class="Other">[</span><span class="Identifier">OutboundWrite</span><span class="Other">]</span>
   <span class="Identifier">writerRunning</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
-  <span class="Identifier">writerWake</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">CpsVoidFuture</span>
   <span class="Identifier">writerError</span><span class="Operator">*</span><span class="Other">:</span> <span class="Keyword">ref</span> <span class="Identifier">CatchableError</span>
   <span class="Identifier">connectionWindowWaiters</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">CpsVoidFuture</span><span class="Other">]</span>
   <span class="Identifier">shutdownFlag</span><span class="Operator">*</span><span class="Other">:</span> <span class="Keyword">ptr</span> <span class="Identifier">bool</span>
@@ -301,10 +299,10 @@ Send go away through the active transport.</p>
 <div id="processServerFrame-procs-all">
   <div id="processServerFrame,Http2ServerConnection,Http2Frame">
   <dt><pre><span class="Keyword">proc</span> <a href="#processServerFrame%2CHttp2ServerConnection%2CHttp2Frame"><span class="Identifier">processServerFrame</span></a><span class="Other">(</span><span class="Identifier">conn</span><span class="Other">:</span> <a href="http2.html#Http2ServerConnection"><span class="Identifier">Http2ServerConnection</span></a><span class="Other">;</span> <span class="Identifier">frame</span><span class="Other">:</span> <a href="../shared/http2.html#Http2Frame"><span class="Identifier">Http2Frame</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">CpsVoidFuture</span> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
-    
+    Process an owned frame. The network receive path uses borrowed frames; this entry point remains useful for protocol tests and frame injection.
     
   </dd>
 </div>
@@ -337,10 +335,11 @@ Send go away through the active transport.</p>
 <div id="sendFrame-procs-all">
   <div id="sendFrame,Http2ServerConnection,Http2Frame">
   <dt><pre><span class="Keyword">proc</span> <a href="#sendFrame%2CHttp2ServerConnection%2CHttp2Frame"><span class="Identifier">sendFrame</span></a><span class="Other">(</span><span class="Identifier">conn</span><span class="Other">:</span> <a href="http2.html#Http2ServerConnection"><span class="Identifier">Http2ServerConnection</span></a><span class="Other">;</span> <span class="Identifier">frame</span><span class="Other">:</span> <a href="../shared/http2.html#Http2Frame"><span class="Identifier">Http2Frame</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">CpsVoidFuture</span> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+    <span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">IOSelectorsException</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
-    
+    Send frame through the active transport.
     
   </dd>
 </div>
@@ -373,14 +372,14 @@ Send go away through the active transport.</p>
 
 </div>
 <div id="sendResponseHeaders-procs-all">
-  <div id="sendResponseHeaders,Http2ServerConnection,uint32,int,seq[],bool">
-  <dt><pre><span class="Keyword">proc</span> <a href="#sendResponseHeaders%2CHttp2ServerConnection%2Cuint32%2Cint%2Cseq%5B%5D%2Cbool"><span class="Identifier">sendResponseHeaders</span></a><span class="Other">(</span><span class="Identifier">conn</span><span class="Other">:</span> <a href="http2.html#Http2ServerConnection"><span class="Identifier">Http2ServerConnection</span></a><span class="Other">;</span> <span class="Identifier">streamId</span><span class="Other">:</span> <span class="Identifier">uint32</span><span class="Other">;</span>
+  <div id="sendResponseHeaders,Http2ServerConnection,uint32,int,seq[],bool,int">
+  <dt><pre><span class="Keyword">proc</span> <a href="#sendResponseHeaders%2CHttp2ServerConnection%2Cuint32%2Cint%2Cseq%5B%5D%2Cbool%2Cint"><span class="Identifier">sendResponseHeaders</span></a><span class="Other">(</span><span class="Identifier">conn</span><span class="Other">:</span> <a href="http2.html#Http2ServerConnection"><span class="Identifier">Http2ServerConnection</span></a><span class="Other">;</span> <span class="Identifier">streamId</span><span class="Other">:</span> <span class="Identifier">uint32</span><span class="Other">;</span>
                          <span class="Identifier">statusCode</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">;</span> <span class="Identifier">headers</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Other">(</span><span class="Identifier">string</span><span class="Other">,</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">]</span><span class="Other">;</span>
-                         <span class="Identifier">endStream</span><span class="Other">:</span> <span class="Identifier">bool</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">CpsVoidFuture</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span>
-    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+                         <span class="Identifier">endStream</span><span class="Other">:</span> <span class="Identifier">bool</span><span class="Other">;</span> <span class="Identifier">contentLengthHint</span><span class="Other">:</span> <span class="Identifier">int</span> <span class="Other">=</span> <span class="DecNumber">-1</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">CpsVoidFuture</span> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
-    
+    A header block may span HEADERS plus CONTINUATION frames, but it remains one ordered write.  Coalescing those frames avoids a TLS record/syscall per continuation without changing their HTTP/2 framing. Forwarding the writer's future also avoids an otherwise redundant CPS result future.
     
   </dd>
 </div>
@@ -408,7 +407,7 @@ Send go away through the active transport.</p>
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-25 20:56:14 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-31 16:23:39 UTC</small>
       </div>
     </div>
   </div>

@@ -246,6 +246,10 @@
   <li><a class="reference" href="#hasMasqueSession%2CHttp3Connection%2Cuint64" title="hasMasqueSession(conn: Http3Connection; streamId: uint64): bool">hasMasqueSession(conn: Http3Connection; streamId: uint64): bool</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">hasPendingQpackStreamData
+  <li><a class="reference" href="#hasPendingQpackStreamData%2CHttp3Connection" title="hasPendingQpackStreamData(conn: Http3Connection): bool">hasPendingQpackStreamData(conn: Http3Connection): bool</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">hasWebTransportSession
   <li><a class="reference" href="#hasWebTransportSession%2CHttp3Connection%2Cuint64" title="hasWebTransportSession(conn: Http3Connection; streamId: uint64): bool">hasWebTransportSession(conn: Http3Connection; streamId: uint64): bool</a></li>
 
@@ -331,6 +335,18 @@
                          payload: openArray[byte];
                          allowInformationalHeaders: bool = false;
                          streamRole: Http3StreamRole = h3srRequest): seq[
+    Http3Event]</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">processRequestStreamDataOwned
+  <li><a class="reference" href="#processRequestStreamDataOwned%2CHttp3Connection%2Cuint64%2Cseq%5Bbyte%5D%2Cbool%2CHttp3StreamRole" title="processRequestStreamDataOwned(conn: Http3Connection; streamId: uint64;
+                              payload: seq[byte];
+                              allowInformationalHeaders: bool = false;
+                              streamRole: Http3StreamRole = h3srRequest): seq[
+    Http3Event]">processRequestStreamDataOwned(conn: Http3Connection; streamId: uint64;
+                              payload: seq[byte];
+                              allowInformationalHeaders: bool = false;
+                              streamRole: Http3StreamRole = h3srRequest): seq[
     Http3Event]</a></li>
 
 </ul>
@@ -851,6 +867,18 @@
 </div>
 
 </div>
+<div id="hasPendingQpackStreamData-procs-all">
+  <div id="hasPendingQpackStreamData,Http3Connection">
+  <dt><pre><span class="Keyword">proc</span> <a href="#hasPendingQpackStreamData%2CHttp3Connection"><span class="Identifier">hasPendingQpackStreamData</span></a><span class="Other">(</span><span class="Identifier">conn</span><span class="Other">:</span> <a href="http3_connection.html#Http3Connection"><span class="Identifier">Http3Connection</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.<span class="Identifier">inline</span><span class="Other">,</span>
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Return whether either local QPACK control stream has bytes to transmit. Callers can use this before entering an asynchronous flush path.
+    
+  </dd>
+</div>
+
+</div>
 <div id="hasWebTransportSession-procs-all">
   <div id="hasWebTransportSession,Http3Connection,uint64">
   <dt><pre><span class="Keyword">proc</span> <a href="#hasWebTransportSession%2CHttp3Connection%2Cuint64"><span class="Identifier">hasWebTransportSession</span></a><span class="Other">(</span><span class="Identifier">conn</span><span class="Other">:</span> <a href="http3_connection.html#Http3Connection"><span class="Identifier">Http3Connection</span></a><span class="Other">;</span> <span class="Identifier">streamId</span><span class="Other">:</span> <span class="Identifier">uint64</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.
@@ -1035,6 +1063,21 @@
 </div>
 
 </div>
+<div id="processRequestStreamDataOwned-procs-all">
+  <div id="processRequestStreamDataOwned,Http3Connection,uint64,seq[byte],bool,Http3StreamRole">
+  <dt><pre><span class="Keyword">proc</span> <a href="#processRequestStreamDataOwned%2CHttp3Connection%2Cuint64%2Cseq%5Bbyte%5D%2Cbool%2CHttp3StreamRole"><span class="Identifier">processRequestStreamDataOwned</span></a><span class="Other">(</span><span class="Identifier">conn</span><span class="Other">:</span> <a href="http3_connection.html#Http3Connection"><span class="Identifier">Http3Connection</span></a><span class="Other">;</span> <span class="Identifier">streamId</span><span class="Other">:</span> <span class="Identifier">uint64</span><span class="Other">;</span>
+                                   <span class="Identifier">payload</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">byte</span><span class="Other">]</span><span class="Other">;</span>
+                                   <span class="Identifier">allowInformationalHeaders</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">;</span>
+                                   <span class="Identifier">streamRole</span><span class="Other">:</span> <a href="http3_connection.html#Http3StreamRole"><span class="Identifier">Http3StreamRole</span></a> <span class="Other">=</span> <span class="Identifier">h3srRequest</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span>
+    <a href="http3_connection.html#Http3Event"><span class="Identifier">Http3Event</span></a><span class="Other">]</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Parse owned stream bytes without copying them into an empty reassembly buffer. Fragmented streams still append to their retained partial frame.
+    
+  </dd>
+</div>
+
+</div>
 <div id="registerMasqueIpSession-procs-all">
   <div id="registerMasqueIpSession,Http3Connection,uint64,string,string">
   <dt><pre><span class="Keyword">proc</span> <a href="#registerMasqueIpSession%2CHttp3Connection%2Cuint64%2Cstring%2Cstring"><span class="Identifier">registerMasqueIpSession</span></a><span class="Other">(</span><span class="Identifier">conn</span><span class="Other">:</span> <a href="http3_connection.html#Http3Connection"><span class="Identifier">Http3Connection</span></a><span class="Other">;</span> <span class="Identifier">streamId</span><span class="Other">:</span> <span class="Identifier">uint64</span><span class="Other">;</span>
@@ -1170,7 +1213,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-25 20:56:27 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-31 16:23:48 UTC</small>
       </div>
     </div>
   </div>

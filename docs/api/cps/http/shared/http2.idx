@@ -37,19 +37,20 @@ nim	Http2Stream	cps/http/shared/http2.html#Http2Stream	type Http2Stream		73
 nim	Http2Response	cps/http/shared/http2.html#Http2Response	object Http2Response		88
 nim	Http2Connection	cps/http/shared/http2.html#Http2Connection	type Http2Connection		93
 nim	serializeFrame	cps/http/shared/http2.html#serializeFrame,Http2Frame	proc serializeFrame(frame: Http2Frame): seq[byte]		118
-nim	appendSerializedFrameSlice	cps/http/shared/http2.html#appendSerializedFrameSlice,string,uint8,uint8,uint32,openArray[byte],int,int	proc appendSerializedFrameSlice(dest: var string; frameType, flags: uint8;\n                           streamId: uint32; payload: openArray[byte];\n                           payloadOffset, payloadLen: int)		139
-nim	appendSerializedFrame	cps/http/shared/http2.html#appendSerializedFrame,string,Http2Frame	proc appendSerializedFrame(dest: var string; frame: Http2Frame)		164
-nim	parseFrameHeader	cps/http/shared/http2.html#parseFrameHeader,string	proc parseFrameHeader(data: string): Http2Frame		172
-nim	bytesFromString	cps/http/shared/http2.html#bytesFromString,string	proc bytesFromString(data: string): seq[byte]		184
-nim	parseFrame	cps/http/shared/http2.html#parseFrame,seq[byte]	proc parseFrame(data: seq[byte]): Http2Frame		195
-nim	newHttp2Connection	cps/http/shared/http2.html#newHttp2Connection,AsyncStream	proc newHttp2Connection(stream: AsyncStream): Http2Connection		212
-nim	sendFrame	cps/http/shared/http2.html#sendFrame,Http2Connection,Http2Frame	proc sendFrame(conn: Http2Connection; frame: Http2Frame): CpsVoidFuture		291
-nim	sendSettings	cps/http/shared/http2.html#sendSettings,Http2Connection,seq[]	proc sendSettings(conn: Http2Connection; settings: seq[(uint16, uint32)] = @[]): CpsVoidFuture		295
-nim	sendSettingsAck	cps/http/shared/http2.html#sendSettingsAck,Http2Connection	proc sendSettingsAck(conn: Http2Connection): CpsVoidFuture		313
-nim	sendWindowUpdate	cps/http/shared/http2.html#sendWindowUpdate,Http2Connection,uint32,uint32	proc sendWindowUpdate(conn: Http2Connection; streamId: uint32; increment: uint32): CpsVoidFuture		323
-nim	failAllStreams	cps/http/shared/http2.html#failAllStreams,Http2Connection,ref.CatchableError	proc failAllStreams(conn: Http2Connection; err: ref CatchableError)		343
-nim	processFrame	cps/http/shared/http2.html#processFrame,Http2Connection,Http2Frame	proc processFrame(conn: Http2Connection; frame: Http2Frame): seq[Http2Frame]		780
-nim	recvFrame	cps/http/shared/http2.html#recvFrame,Http2Connection	proc recvFrame(conn: Http2Connection): CpsFuture[Http2Frame]		2410
-nim	initConnection	cps/http/shared/http2.html#initConnection,Http2Connection,Http2Fingerprint	proc initConnection(conn: Http2Connection; h2fp: Http2Fingerprint = nil): CpsVoidFuture		2410
-nim	runReceiveLoop	cps/http/shared/http2.html#runReceiveLoop,Http2Connection	proc runReceiveLoop(conn: Http2Connection): CpsVoidFuture		2410
-nim	request	cps/http/shared/http2.html#request,Http2Connection,string,string,string,seq[],string,seq[string]	proc request(conn: Http2Connection; meth: string; path: string; authority: string;\n        headers: seq[(string, string)] = @[]; body: string = "";\n        pseudoHeaderOrder: seq[string] = @[]): CpsFuture[Http2Response]		2410
+nim	appendSerializedFrameMemory	cps/http/shared/http2.html#appendSerializedFrameMemory,string,uint8,uint8,uint32,pointer,int	proc appendSerializedFrameMemory(dest: var string; frameType, flags: uint8;\n                            streamId: uint32; payload: pointer; payloadLen: int)		139
+nim	appendSerializedFrameSlice	cps/http/shared/http2.html#appendSerializedFrameSlice,string,uint8,uint8,uint32,openArray[byte],int,int	proc appendSerializedFrameSlice(dest: var string; frameType, flags: uint8;\n                           streamId: uint32; payload: openArray[byte];\n                           payloadOffset, payloadLen: int)		163
+nim	appendSerializedFrame	cps/http/shared/http2.html#appendSerializedFrame,string,Http2Frame	proc appendSerializedFrame(dest: var string; frame: Http2Frame)		179
+nim	parseFrameHeader	cps/http/shared/http2.html#parseFrameHeader,string	proc parseFrameHeader(data: string): Http2Frame		187
+nim	bytesFromString	cps/http/shared/http2.html#bytesFromString,string	proc bytesFromString(data: string): seq[byte]		199
+nim	parseFrame	cps/http/shared/http2.html#parseFrame,seq[byte]	proc parseFrame(data: seq[byte]): Http2Frame		210
+nim	newHttp2Connection	cps/http/shared/http2.html#newHttp2Connection,AsyncStream	proc newHttp2Connection(stream: AsyncStream): Http2Connection		227
+nim	sendFrame	cps/http/shared/http2.html#sendFrame,Http2Connection,Http2Frame	proc sendFrame(conn: Http2Connection; frame: Http2Frame): CpsVoidFuture		306
+nim	sendSettings	cps/http/shared/http2.html#sendSettings,Http2Connection,seq[]	proc sendSettings(conn: Http2Connection; settings: seq[(uint16, uint32)] = @[]): CpsVoidFuture		310
+nim	sendSettingsAck	cps/http/shared/http2.html#sendSettingsAck,Http2Connection	proc sendSettingsAck(conn: Http2Connection): CpsVoidFuture		328
+nim	sendWindowUpdate	cps/http/shared/http2.html#sendWindowUpdate,Http2Connection,uint32,uint32	proc sendWindowUpdate(conn: Http2Connection; streamId: uint32; increment: uint32): CpsVoidFuture		338
+nim	failAllStreams	cps/http/shared/http2.html#failAllStreams,Http2Connection,ref.CatchableError	proc failAllStreams(conn: Http2Connection; err: ref CatchableError)		358
+nim	processFrame	cps/http/shared/http2.html#processFrame,Http2Connection,Http2Frame	proc processFrame(conn: Http2Connection; frame: Http2Frame): seq[Http2Frame]		795
+nim	recvFrame	cps/http/shared/http2.html#recvFrame,Http2Connection	proc recvFrame(conn: Http2Connection): CpsFuture[Http2Frame]		2425
+nim	initConnection	cps/http/shared/http2.html#initConnection,Http2Connection,Http2Fingerprint	proc initConnection(conn: Http2Connection; h2fp: Http2Fingerprint = nil): CpsVoidFuture		2425
+nim	runReceiveLoop	cps/http/shared/http2.html#runReceiveLoop,Http2Connection	proc runReceiveLoop(conn: Http2Connection): CpsVoidFuture		2425
+nim	request	cps/http/shared/http2.html#request,Http2Connection,string,string,string,seq[],string,seq[string]	proc request(conn: Http2Connection; meth: string; path: string; authority: string;\n        headers: seq[(string, string)] = @[]; body: string = "";\n        pseudoHeaderOrder: seq[string] = @[]): CpsFuture[Http2Response]		2425

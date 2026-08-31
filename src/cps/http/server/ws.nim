@@ -35,10 +35,9 @@ proc headerHasToken(value, token: string): bool =
   false
 
 proc getHeaderValues(req: HttpRequest, name: string): seq[string] =
-  let lower = name.toLowerAscii
   for (k, v) in req.headers:
-    if k.toLowerAscii == lower:
-      result.add(v)
+    if eqCaseInsensitive(k, name):
+      result.add(v.toString())
 
 proc headersHaveToken(values: openArray[string], token: string): bool =
   for v in values:
@@ -84,7 +83,7 @@ proc acceptWebSocket*(stream: AsyncStream, reader: BufferedReader,
       fut.fail(newException(WsError, "Expected CONNECT method for HTTP/2 WebSocket, got: " & req.meth))
       return fut
     let protocolHeader = req.getHeader(":protocol")
-    if protocolHeader.toLowerAscii != "websocket":
+    if protocolHeader.toString().toLowerAscii != "websocket":
       fut.fail(newException(WsError, "Expected :protocol=websocket, got: " & protocolHeader))
       return fut
     let wsVersionHeader = req.getHeader("sec-websocket-version")
@@ -93,7 +92,7 @@ proc acceptWebSocket*(stream: AsyncStream, reader: BufferedReader,
       return fut
     # Parse permessage-deflate extension
     let wsExtHeader = req.getHeader("sec-websocket-extensions")
-    let extParsed = parseWsExtensions(wsExtHeader)
+    let extParsed = parseWsExtensions(wsExtHeader.toString())
 
     # Send HEADERS with :status=200
     var h2Headers: seq[(string, string)]
@@ -133,7 +132,7 @@ proc acceptWebSocket*(stream: AsyncStream, reader: BufferedReader,
     if req.httpVersion != "HTTP/1.1":
       fut.fail(newException(WsError, "Expected HTTP/1.1 for WebSocket upgrade, got: " & req.httpVersion))
       return fut
-    if req.meth.toUpperAscii != "GET":
+    if not eqCaseInsensitive(req.meth, "GET"):
       fut.fail(newException(WsError, "Expected GET method for WebSocket upgrade, got: " & req.meth))
       return fut
 

@@ -1,14 +1,14 @@
 nimTitle	http3	cps/http/server/http3.html	module cps/http/server/http3		0
-nim	Http3ProtocolViolation	cps/http/server/http3.html#Http3ProtocolViolation	object Http3ProtocolViolation		13
-nim	Http3ServerSession	cps/http/server/http3.html#Http3ServerSession	type Http3ServerSession		24
-nim	newHttp3ServerSession	cps/http/server/http3.html#newHttp3ServerSession,seq[byte],HttpHandler,int,bool	proc newHttp3ServerSession(connId: seq[byte]; handler: HttpHandler;\n                      maxRequestBodySize: int = 10240 * 1024;\n                      enableDatagram: bool = true): Http3ServerSession		40
-nim	handleHttp3RequestFrames	cps/http/server/http3.html#handleHttp3RequestFrames,Http3ServerSession,uint64,seq[byte],bool	proc handleHttp3RequestFrames(session: Http3ServerSession; streamId: uint64;\n                         framePayload: seq[byte]; streamEnded: bool = true): CpsFuture[\n    seq[byte]]		2410
-nim	createPushPromise	cps/http/server/http3.html#createPushPromise,Http3ServerSession,uint64,uint64,seq[QpackHeaderField]	proc createPushPromise(session: Http3ServerSession; streamId: uint64; pushId: uint64;\n                  headers: seq[QpackHeaderField]): seq[byte]		617
-nim	cancelPush	cps/http/server/http3.html#cancelPush,Http3ServerSession,uint64	proc cancelPush(session: Http3ServerSession; pushId: uint64): seq[byte]		651
-nim	pendingRequestStreamIds	cps/http/server/http3.html#pendingRequestStreamIds,Http3ServerSession	proc pendingRequestStreamIds(session: Http3ServerSession): seq[uint64]		655
-nim	hasPendingRequestStream	cps/http/server/http3.html#hasPendingRequestStream,Http3ServerSession,uint64	proc hasPendingRequestStream(session: Http3ServerSession; streamId: uint64): bool		660
-nim	hasPendingRequests	cps/http/server/http3.html#hasPendingRequests,Http3ServerSession	proc hasPendingRequests(session: Http3ServerSession): bool		664
-nim	qpackBlockedRequestStreamIds	cps/http/server/http3.html#qpackBlockedRequestStreamIds,Http3ServerSession	proc qpackBlockedRequestStreamIds(session: Http3ServerSession): seq[uint64]		668
-nim	isQpackBlockedRequestStream	cps/http/server/http3.html#isQpackBlockedRequestStream,Http3ServerSession,uint64	proc isQpackBlockedRequestStream(session: Http3ServerSession; streamId: uint64): bool		673
-nim	routeH3Datagram	cps/http/server/http3.html#routeH3Datagram,Http3ServerSession,openArray[byte]	proc routeH3Datagram(session: Http3ServerSession; payload: openArray[byte]): tuple[\n    consumed: bool, outgoing: seq[seq[byte]]]		677
-nim	drainMasqueOutgoingCapsulesByStream	cps/http/server/http3.html#drainMasqueOutgoingCapsulesByStream,Http3ServerSession	proc drainMasqueOutgoingCapsulesByStream(session: Http3ServerSession): seq[\n    tuple[streamId: uint64, capsules: seq[MasqueCapsule]]]		693
+nim	Http3ProtocolViolation	cps/http/server/http3.html#Http3ProtocolViolation	object Http3ProtocolViolation		14
+nim	Http3ServerSession	cps/http/server/http3.html#Http3ServerSession	type Http3ServerSession		25
+nim	newHttp3ServerSession	cps/http/server/http3.html#newHttp3ServerSession,seq[byte],HttpHandler,int,bool	proc newHttp3ServerSession(connId: seq[byte]; handler: HttpHandler;\n                      maxRequestBodySize: int = 10240 * 1024;\n                      enableDatagram: bool = true): Http3ServerSession		41
+nim	handleHttp3RequestFrames	cps/http/server/http3.html#handleHttp3RequestFrames,Http3ServerSession,uint64,seq[byte],bool	proc handleHttp3RequestFrames(session: Http3ServerSession; streamId: uint64;\n                         framePayload: seq[byte]; streamEnded: bool = true): CpsFuture[\n    seq[byte]]		2425
+nim	createPushPromise	cps/http/server/http3.html#createPushPromise,Http3ServerSession,uint64,uint64,seq[QpackHeaderField]	proc createPushPromise(session: Http3ServerSession; streamId: uint64; pushId: uint64;\n                  headers: seq[QpackHeaderField]): seq[byte]		633
+nim	cancelPush	cps/http/server/http3.html#cancelPush,Http3ServerSession,uint64	proc cancelPush(session: Http3ServerSession; pushId: uint64): seq[byte]		667
+nim	pendingRequestStreamIds	cps/http/server/http3.html#pendingRequestStreamIds,Http3ServerSession	proc pendingRequestStreamIds(session: Http3ServerSession): seq[uint64]		671
+nim	hasPendingRequestStream	cps/http/server/http3.html#hasPendingRequestStream,Http3ServerSession,uint64	proc hasPendingRequestStream(session: Http3ServerSession; streamId: uint64): bool		676
+nim	hasPendingRequests	cps/http/server/http3.html#hasPendingRequests,Http3ServerSession	proc hasPendingRequests(session: Http3ServerSession): bool		680
+nim	qpackBlockedRequestStreamIds	cps/http/server/http3.html#qpackBlockedRequestStreamIds,Http3ServerSession	proc qpackBlockedRequestStreamIds(session: Http3ServerSession): seq[uint64]		684
+nim	isQpackBlockedRequestStream	cps/http/server/http3.html#isQpackBlockedRequestStream,Http3ServerSession,uint64	proc isQpackBlockedRequestStream(session: Http3ServerSession; streamId: uint64): bool		689
+nim	routeH3Datagram	cps/http/server/http3.html#routeH3Datagram,Http3ServerSession,openArray[byte]	proc routeH3Datagram(session: Http3ServerSession; payload: openArray[byte]): tuple[\n    consumed: bool, outgoing: seq[seq[byte]]]		693
+nim	drainMasqueOutgoingCapsulesByStream	cps/http/server/http3.html#drainMasqueOutgoingCapsulesByStream,Http3ServerSession	proc drainMasqueOutgoingCapsulesByStream(session: Http3ServerSession): seq[\n    tuple[streamId: uint64, capsules: seq[MasqueCapsule]]]		709

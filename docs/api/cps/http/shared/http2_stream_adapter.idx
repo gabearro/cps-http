@@ -1,10 +1,12 @@
 nimTitle	http2_stream_adapter	cps/http/shared/http2_stream_adapter.html	module cps/http/shared/http2_stream_adapter		0
 nim	AdapterSendHeadersProc	cps/http/shared/http2_stream_adapter.html#AdapterSendHeadersProc	type AdapterSendHeadersProc		16
 nim	AdapterSendDataProc	cps/http/shared/http2_stream_adapter.html#AdapterSendDataProc	type AdapterSendDataProc		18
-nim	AdapterCloseWriteProc	cps/http/shared/http2_stream_adapter.html#AdapterCloseWriteProc	type AdapterCloseWriteProc		19
-nim	Http2StreamAdapter	cps/http/shared/http2_stream_adapter.html#Http2StreamAdapter	type Http2StreamAdapter		26
-nim	feedData	cps/http/shared/http2_stream_adapter.html#feedData,Http2StreamAdapter,string	proc feedData(a: Http2StreamAdapter; data: string)		54
-nim	feedEof	cps/http/shared/http2_stream_adapter.html#feedEof,Http2StreamAdapter	proc feedEof(a: Http2StreamAdapter)		59
-nim	newHttp2StreamAdapter	cps/http/shared/http2_stream_adapter.html#newHttp2StreamAdapter,uint32,AdapterSendHeadersProc,AdapterSendDataProc,AdapterCloseWriteProc	proc newHttp2StreamAdapter(streamId: uint32; sendHeadersProc: AdapterSendHeadersProc;\n                      sendDataProc: AdapterSendDataProc;\n                      closeWriteProc: AdapterCloseWriteProc = nil): Http2StreamAdapter		106
-nim	sendResponseHeaders	cps/http/shared/http2_stream_adapter.html#sendResponseHeaders,Http2StreamAdapter,int,seq[]	proc sendResponseHeaders(a: Http2StreamAdapter; statusCode: int;\n                    headers: seq[(string, string)] = @[]): CpsVoidFuture		2410
-nim	hasSentResponseHeaders	cps/http/shared/http2_stream_adapter.html#hasSentResponseHeaders,Http2StreamAdapter	proc hasSentResponseHeaders(a: Http2StreamAdapter): bool		141
+nim	AdapterCloseWriteProc	cps/http/shared/http2_stream_adapter.html#AdapterCloseWriteProc	type AdapterCloseWriteProc		20
+nim	Http2StreamAdapter	cps/http/shared/http2_stream_adapter.html#Http2StreamAdapter	type Http2StreamAdapter		27
+nim	feedData	cps/http/shared/http2_stream_adapter.html#feedData,Http2StreamAdapter,pointer,int	proc feedData(a: Http2StreamAdapter; data: pointer; len: int)		56
+nim	feedData	cps/http/shared/http2_stream_adapter.html#feedData,Http2StreamAdapter,string	proc feedData(a: Http2StreamAdapter; data: string)		64
+nim	feedEof	cps/http/shared/http2_stream_adapter.html#feedEof,Http2StreamAdapter	proc feedEof(a: Http2StreamAdapter)		69
+nim	newHttp2StreamAdapter	cps/http/shared/http2_stream_adapter.html#newHttp2StreamAdapter,uint32,AdapterSendHeadersProc,AdapterSendDataProc,AdapterCloseWriteProc	proc newHttp2StreamAdapter(streamId: uint32; sendHeadersProc: AdapterSendHeadersProc;\n                      sendDataProc: AdapterSendDataProc;\n                      closeWriteProc: AdapterCloseWriteProc = nil): Http2StreamAdapter		130
+nim	sendResponseHeaders	cps/http/shared/http2_stream_adapter.html#sendResponseHeaders,Http2StreamAdapter,int,seq[]	proc sendResponseHeaders(a: Http2StreamAdapter; statusCode: int;\n                    headers: seq[(string, string)] = @[]): CpsVoidFuture		2425
+nim	hasSentResponseHeaders	cps/http/shared/http2_stream_adapter.html#hasSentResponseHeaders,Http2StreamAdapter	proc hasSentResponseHeaders(a: Http2StreamAdapter): bool		166
+nimgrp	feeddata	cps/http/shared/http2_stream_adapter.html#feedData-procs-all	proc		56

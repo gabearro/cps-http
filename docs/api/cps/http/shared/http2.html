@@ -150,6 +150,12 @@
   <li><a class="reference" href="#appendSerializedFrame%2Cstring%2CHttp2Frame" title="appendSerializedFrame(dest: var string; frame: Http2Frame)">appendSerializedFrame(dest: var string; frame: Http2Frame)</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">appendSerializedFrameMemory
+  <li><a class="reference" href="#appendSerializedFrameMemory%2Cstring%2Cuint8%2Cuint8%2Cuint32%2Cpointer%2Cint" title="appendSerializedFrameMemory(dest: var string; frameType, flags: uint8;
+                            streamId: uint32; payload: pointer; payloadLen: int)">appendSerializedFrameMemory(dest: var string; frameType, flags: uint8;
+                            streamId: uint32; payload: pointer; payloadLen: int)</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">appendSerializedFrameSlice
   <li><a class="reference" href="#appendSerializedFrameSlice%2Cstring%2Cuint8%2Cuint8%2Cuint32%2CopenArray%5Bbyte%5D%2Cint%2Cint" title="appendSerializedFrameSlice(dest: var string; frameType, flags: uint8;
                            streamId: uint32; payload: openArray[byte];
@@ -552,6 +558,20 @@
 </div>
 
 </div>
+<div id="appendSerializedFrameMemory-procs-all">
+  <div id="appendSerializedFrameMemory,string,uint8,uint8,uint32,pointer,int">
+  <dt><pre><span class="Keyword">proc</span> <a href="#appendSerializedFrameMemory%2Cstring%2Cuint8%2Cuint8%2Cuint32%2Cpointer%2Cint"><span class="Identifier">appendSerializedFrameMemory</span></a><span class="Other">(</span><span class="Identifier">dest</span><span class="Other">:</span> <span class="Keyword">var</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">frameType</span><span class="Other">,</span> <span class="Identifier">flags</span><span class="Other">:</span> <span class="Identifier">uint8</span><span class="Other">;</span>
+                                 <span class="Identifier">streamId</span><span class="Other">:</span> <span class="Identifier">uint32</span><span class="Other">;</span> <span class="Identifier">payload</span><span class="Other">:</span> <span class="Identifier">pointer</span><span class="Other">;</span>
+                                 <span class="Identifier">payloadLen</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Append a frame directly from borrowed memory. The bytes are copied once into the connection-owned serialized write, which is the lifetime needed by an asynchronous HTTP/2 writer queue.
+    
+  </dd>
+</div>
+
+</div>
 <div id="appendSerializedFrameSlice-procs-all">
   <div id="appendSerializedFrameSlice,string,uint8,uint8,uint32,openArray[byte],int,int">
   <dt><pre><span class="Keyword">proc</span> <a href="#appendSerializedFrameSlice%2Cstring%2Cuint8%2Cuint8%2Cuint32%2CopenArray%5Bbyte%5D%2Cint%2Cint"><span class="Identifier">appendSerializedFrameSlice</span></a><span class="Other">(</span><span class="Identifier">dest</span><span class="Other">:</span> <span class="Keyword">var</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">frameType</span><span class="Other">,</span> <span class="Identifier">flags</span><span class="Other">:</span> <span class="Identifier">uint8</span><span class="Other">;</span>
@@ -758,7 +778,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-25 20:56:25 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-31 16:23:47 UTC</small>
       </div>
     </div>
   </div>

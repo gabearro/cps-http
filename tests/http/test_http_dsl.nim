@@ -1614,7 +1614,7 @@ block testTypedPathUuid:
 block testOptionalPathSegment:
   let handler = router:
     get "/posts/{format?}":
-      let fmt = pathParams.getOrDefault("format", "html")
+      let fmt = pathParams.getOrDefault("format", view("html"))
       respond 200, "format:" & fmt
   let client = newTestClient(handler)
 
@@ -1737,8 +1737,8 @@ block testNamedRoutes:
     routes: @[RouteEntry(
       meth: "GET",
       segments: parsePath("/users/{id}"),
-      handler: proc(req: HttpRequest, pp: Table[string, string],
-                    qp: Table[string, string]): CpsFuture[HttpResponseBuilder] {.closure.} =
+      handler: proc(req: HttpRequest, pp: RouteParams,
+                    qp: RouteParams): CpsFuture[HttpResponseBuilder] {.closure.} =
         let fut = newCpsFuture[HttpResponseBuilder]()
         fut.complete(newResponse(200, "user"))
         return fut,
@@ -2047,8 +2047,8 @@ block testSubRouterMount:
     RouteEntry(
       meth: "GET",
       segments: parsePath("/users"),
-      handler: proc(req: HttpRequest, pp: Table[string, string],
-                    qp: Table[string, string]): CpsFuture[HttpResponseBuilder] {.closure.} =
+      handler: proc(req: HttpRequest, pp: RouteParams,
+                    qp: RouteParams): CpsFuture[HttpResponseBuilder] {.closure.} =
         let fut = newCpsFuture[HttpResponseBuilder]()
         fut.complete(newResponse(200, "api users"))
         return fut
@@ -2314,7 +2314,7 @@ block testOpenApiSpec:
   assert resp.getResponseHeader("content-type") == "application/json"
 
   # Parse the JSON spec
-  let spec = parseJson(resp.body)
+  let spec = parseJson(resp.body.toString())
   assert spec["openapi"].getStr() == "3.0.3"
   assert spec["info"]["title"].getStr() == "Test API"
   assert spec["info"]["version"].getStr() == "2.0.0"
@@ -2376,7 +2376,7 @@ block testOpenApiNoAnnotations:
       respond 201, "ok"
 
   let client = newTestClient(handler)
-  let spec = parseJson(client.runRequest("GET", "/openapi.json").body)
+  let spec = parseJson(client.runRequest("GET", "/openapi.json").body.toString())
   assert spec["paths"].hasKey("/plain")
   assert spec["paths"]["/plain"].hasKey("get")
   assert spec["paths"].hasKey("/submit")
@@ -2734,14 +2734,12 @@ block testConstRoutePaths:
 # Test 104: trusted proxy forwarding is opt-in
 # ============================================================
 block testTrustedProxyForwarding:
-  var req = HttpRequest(
-    headers: @[
+  var req = newOwnedRequest("", "", @[
       ("x-forwarded-for", "203.0.113.7, 10.1.2.3"),
       ("x-real-ip", "198.51.100.9")
-    ],
-    remoteAddr: "10.1.2.3",
-    context: newTable[string, string]()
-  )
+    ])
+  req.remoteAddr = "10.1.2.3"
+  req.context = newTable[string, string]()
   req.context["remote_addr"] = "10.1.2.3"
 
   # Untrusted by default: use socket peer address.

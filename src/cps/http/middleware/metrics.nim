@@ -107,10 +107,10 @@ proc metricsMiddleware*(collector: MetricsCollector): Middleware =
   let cap = collector
   result = proc(req: HttpRequest, next: HttpHandler): CpsFuture[HttpResponseBuilder] {.closure.} =
     let startTime = epochTime()
-    let capturedMethod = req.meth
+    let capturedMethod = req.meth.toString()
     let capturedPath =
-      if req.context.isNil: pathWithoutQuery(req.path)
-      else: req.context.getOrDefault("route_pattern", pathWithoutQuery(req.path))
+      if req.context.isNil: pathWithoutQuery(req.path.toString())
+      else: req.context.getOrDefault("route_pattern", pathWithoutQuery(req.path.toString()))
     let fut = next(req)
     let resultFut = newCpsFuture[HttpResponseBuilder]()
     fut.addCallback(proc() =

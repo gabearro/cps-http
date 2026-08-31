@@ -38,7 +38,12 @@ proc remoteIp(client: TcpStream): string =
 
 proc handleAcceptedConnection(server: HttpServer, client: TcpStream,
                               tlsCtx: tls_server.TlsServerContext): CpsVoidFuture {.cps.} =
-  let peerIp = remoteIp(client)
+  # Formatting the peer address allocates. Only proxy trust evaluation needs
+  # it; the normal HTTP path keeps accepted connections entirely descriptor-
+  # based until request bytes arrive.
+  let peerIp =
+    if server.config.trustedForwardedHeaders: remoteIp(client)
+    else: ""
   if server.config.useTls:
     let tlsStream = await tls_server.tlsAccept(tlsCtx, client)
     if server.config.enableHttp2 and tlsStream.alpnProto == "h2":

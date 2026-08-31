@@ -23,9 +23,9 @@ nim	setState	cps/http/shared/ws.html#setState,WebSocket,WsState	proc setState(ws
 nim	initWsMtFields	cps/http/shared/ws.html#initWsMtFields,WebSocket	proc initWsMtFields(ws: WebSocket)		91
 nim	computeAcceptKey	cps/http/shared/ws.html#computeAcceptKey,string	proc computeAcceptKey(clientKey: string): string		99
 nim	parseWsExtensions	cps/http/shared/ws.html#parseWsExtensions,string	proc parseWsExtensions(header: string): tuple[enabled: bool, serverNoCtx: bool,\n    clientNoCtx: bool]		109
-nim	recvFrame	cps/http/shared/ws.html#recvFrame,WebSocket	proc recvFrame(ws: WebSocket): CpsFuture[WsFrame]		2410
+nim	recvFrame	cps/http/shared/ws.html#recvFrame,WebSocket	proc recvFrame(ws: WebSocket): CpsFuture[WsFrame]		2425
 nim	sendFrame	cps/http/shared/ws.html#sendFrame,WebSocket,WsOpcode,string,bool	proc sendFrame(ws: WebSocket; opcode: WsOpcode; payload: string; fin: bool = true): CpsVoidFuture		210
-nim	recvMessage	cps/http/shared/ws.html#recvMessage,WebSocket	proc recvMessage(ws: WebSocket): CpsFuture[WsMessage]		2410
+nim	recvMessage	cps/http/shared/ws.html#recvMessage,WebSocket	proc recvMessage(ws: WebSocket): CpsFuture[WsMessage]		2425
 nim	sendText	cps/http/shared/ws.html#sendText,WebSocket,string	proc sendText(ws: WebSocket; data: string): CpsVoidFuture		454
 nim	sendBinary	cps/http/shared/ws.html#sendBinary,WebSocket,string	proc sendBinary(ws: WebSocket; data: string): CpsVoidFuture		462
 nim	sendPing	cps/http/shared/ws.html#sendPing,WebSocket,string	proc sendPing(ws: WebSocket; payload: string = ""): CpsVoidFuture		466

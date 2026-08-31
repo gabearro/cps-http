@@ -185,7 +185,8 @@ proc rewriteHandlerBody(body: NimNode): NimNode =
       elif body.len == 3:
         let key = body[1]
         let default = body[2]
-        return newCall(newDotExpr(qpId, mkIdent("getOrDefault")), key, default)
+        return newCall(newDotExpr(qpId, mkIdent("getOrDefault")), key,
+          newCall(mkIdent("view"), default))
 
     of "pathInt":
       if body.len == 2:
@@ -490,19 +491,22 @@ proc rewriteHandlerBody(body: NimNode): NimNode =
       if body.len == 2:
         let fieldName = body[1]
         return quote do:
-          getUploadedFile(req.body, req.getHeader("content-type"), `fieldName`)
+          getUploadedFile(req.body.toString(),
+            req.getHeader("content-type").toString(), `fieldName`)
 
     of "uploads":
       if body.len == 2:
         let fieldName = body[1]
         return quote do:
-          getUploadedFiles(req.body, req.getHeader("content-type"), `fieldName`)
+          getUploadedFiles(req.body.toString(),
+            req.getHeader("content-type").toString(), `fieldName`)
 
     of "formField":
       if body.len == 2:
         let fieldName = body[1]
         return quote do:
-          getMultipartField(req.body, req.getHeader("content-type"), `fieldName`)
+          getMultipartField(req.body.toString(),
+            req.getHeader("content-type").toString(), `fieldName`)
 
     # --- Error handler keywords ---
 
@@ -719,7 +723,7 @@ proc rewriteHandlerBody(body: NimNode): NimNode =
               queryParamBool(`qpId`, `paramKey`, `default`)
           else:
             return quote do:
-              `qpId`.getOrDefault(`paramKey`, `default`)
+              `qpId`.getOrDefault(`paramKey`, view(`default`))
         else:
           case typeName
           of "int":
@@ -985,8 +989,8 @@ proc buildHandlerProc(handlerName: NimNode, rewrittenBody: NimNode,
     params = [
       newNimNode(nnkBracketExpr).add(mkIdent("CpsFuture"), mkIdent("HttpResponseBuilder")),
       newIdentDefs(reqId, mkIdent("HttpRequest")),
-      newIdentDefs(ppId, newNimNode(nnkBracketExpr).add(mkIdent("Table"), mkIdent("string"), mkIdent("string"))),
-      newIdentDefs(qpId, newNimNode(nnkBracketExpr).add(mkIdent("Table"), mkIdent("string"), mkIdent("string")))
+      newIdentDefs(ppId, mkIdent("RouteParams")),
+      newIdentDefs(qpId, mkIdent("RouteParams"))
     ],
     body = handlerBodyStmts,
     pragmas = newNimNode(nnkPragma).add(mkIdent("cps"))
@@ -1175,8 +1179,8 @@ macro router*(body: untyped): untyped =
             params = [
               newNimNode(nnkBracketExpr).add(mkIdent("CpsFuture"), mkIdent("HttpResponseBuilder")),
               newIdentDefs(reqId, mkIdent("HttpRequest")),
-              newIdentDefs(ppId, newNimNode(nnkBracketExpr).add(mkIdent("Table"), mkIdent("string"), mkIdent("string"))),
-              newIdentDefs(qpId, newNimNode(nnkBracketExpr).add(mkIdent("Table"), mkIdent("string"), mkIdent("string")))
+              newIdentDefs(ppId, mkIdent("RouteParams")),
+              newIdentDefs(qpId, mkIdent("RouteParams"))
             ],
             body = handlerBodyStmts,
             pragmas = newNimNode(nnkPragma).add(mkIdent("cps"))
@@ -1240,8 +1244,8 @@ macro router*(body: untyped): untyped =
             params = [
               newNimNode(nnkBracketExpr).add(mkIdent("CpsFuture"), mkIdent("HttpResponseBuilder")),
               newIdentDefs(reqId, mkIdent("HttpRequest")),
-              newIdentDefs(ppId, newNimNode(nnkBracketExpr).add(mkIdent("Table"), mkIdent("string"), mkIdent("string"))),
-              newIdentDefs(qpId, newNimNode(nnkBracketExpr).add(mkIdent("Table"), mkIdent("string"), mkIdent("string")))
+              newIdentDefs(ppId, mkIdent("RouteParams")),
+              newIdentDefs(qpId, mkIdent("RouteParams"))
             ],
             body = handlerBodyStmts,
             pragmas = newNimNode(nnkPragma).add(mkIdent("cps"))
@@ -1328,9 +1332,11 @@ macro router*(body: untyped): untyped =
           let patternLit = newStrLitNode(urlPrefix & "/*")
 
           stmts.add quote do:
-            proc `handlerName`(req: HttpRequest, pathParams: Table[string, string],
-                                queryParams: Table[string, string]): CpsFuture[HttpResponseBuilder] {.closure.} =
-              serveStaticFile(`fsDirExpr`, `urlPrefixLit`, pathWithoutQuery(req.path), req, fallbackFile = `fallbackFile`)
+            proc `handlerName`(req: HttpRequest, pathParams: RouteParams,
+                                queryParams: RouteParams): CpsFuture[HttpResponseBuilder] {.closure.} =
+              serveStaticFile(`fsDirExpr`, `urlPrefixLit`,
+                pathWithoutQuery(req.path.toString()), req,
+                fallbackFile = `fallbackFile`)
 
           stmts.add quote do:
             `routesSym`.add RouteEntry(
@@ -1390,8 +1396,8 @@ macro router*(body: untyped): untyped =
               newNimNode(nnkBracketExpr).add(mkIdent("CpsFuture"), mkIdent("HttpResponseBuilder")),
               newIdentDefs(reqId, mkIdent("HttpRequest")),
               newIdentDefs(errorId, newNimNode(nnkRefTy).add(mkIdent("CatchableError"))),
-              newIdentDefs(ppId, newNimNode(nnkBracketExpr).add(mkIdent("Table"), mkIdent("string"), mkIdent("string"))),
-              newIdentDefs(qpId, newNimNode(nnkBracketExpr).add(mkIdent("Table"), mkIdent("string"), mkIdent("string")))
+              newIdentDefs(ppId, mkIdent("RouteParams")),
+              newIdentDefs(qpId, mkIdent("RouteParams"))
             ],
             body = handlerBodyStmts,
             pragmas = newNimNode(nnkPragma).add(mkIdent("cps"))
@@ -1429,8 +1435,8 @@ macro router*(body: untyped): untyped =
             params = [
               newNimNode(nnkBracketExpr).add(mkIdent("CpsFuture"), mkIdent("HttpResponseBuilder")),
               newIdentDefs(reqId, mkIdent("HttpRequest")),
-              newIdentDefs(ppId, newNimNode(nnkBracketExpr).add(mkIdent("Table"), mkIdent("string"), mkIdent("string"))),
-              newIdentDefs(qpId, newNimNode(nnkBracketExpr).add(mkIdent("Table"), mkIdent("string"), mkIdent("string")))
+              newIdentDefs(ppId, mkIdent("RouteParams")),
+              newIdentDefs(qpId, mkIdent("RouteParams"))
             ],
             body = bodyStmts,
             pragmas = newNimNode(nnkPragma).add(mkIdent("cps"))
@@ -1441,8 +1447,8 @@ macro router*(body: untyped): untyped =
           let mwName = genSym(nskLet, "beforeMw")
           stmts.add quote do:
             let `mwName`: Middleware = proc(req: HttpRequest, next: HttpHandler): CpsFuture[HttpResponseBuilder] {.closure.} =
-              let emptyPp = initTable[string, string]()
-              let emptyQp = parseQueryString(req.path)
+              let emptyPp = RouteParams()
+              let emptyQp = queryParamsView(req.path)
               let checkFut = `beforeProcName`(req, emptyPp, emptyQp)
               let resultFut = newCpsFuture[HttpResponseBuilder]()
               checkFut.addCallback(proc() =
@@ -1752,8 +1758,8 @@ macro router*(body: untyped): untyped =
             let handlerName = genSym(nskProc, "healthCheck_" & $routeIdx)
             inc routeIdx
             stmts.add quote do:
-              proc `handlerName`(req: HttpRequest, pathParams: Table[string, string],
-                                  queryParams: Table[string, string]): CpsFuture[HttpResponseBuilder] {.closure.} =
+              proc `handlerName`(req: HttpRequest, pathParams: RouteParams,
+                                  queryParams: RouteParams): CpsFuture[HttpResponseBuilder] {.closure.} =
                 let fut = newCpsFuture[HttpResponseBuilder]()
                 fut.complete(newResponse(200, `healthBody`, @[("Content-Type", "text/plain")]))
                 return fut
@@ -1945,8 +1951,8 @@ macro router*(body: untyped): untyped =
             params = [
               newNimNode(nnkBracketExpr).add(mkIdent("CpsFuture"), mkIdent("HttpResponseBuilder")),
               newIdentDefs(reqId, mkIdent("HttpRequest")),
-              newIdentDefs(ppId, newNimNode(nnkBracketExpr).add(mkIdent("Table"), mkIdent("string"), mkIdent("string"))),
-              newIdentDefs(qpId, newNimNode(nnkBracketExpr).add(mkIdent("Table"), mkIdent("string"), mkIdent("string")))
+              newIdentDefs(ppId, mkIdent("RouteParams")),
+              newIdentDefs(qpId, mkIdent("RouteParams"))
             ],
             body = handlerBodyStmts,
             pragmas = newNimNode(nnkPragma).add(mkIdent("cps"))
@@ -2050,8 +2056,8 @@ macro router*(body: untyped): untyped =
     let specHandlerName = genSym(nskProc, "openapiHandler")
     if openApiPublic:
       stmts.add quote do:
-        proc `specHandlerName`(req: HttpRequest, pathParams: Table[string, string],
-                                queryParams: Table[string, string]): CpsFuture[HttpResponseBuilder] {.closure.} =
+        proc `specHandlerName`(req: HttpRequest, pathParams: RouteParams,
+                                queryParams: RouteParams): CpsFuture[HttpResponseBuilder] {.closure.} =
           let fut = newCpsFuture[HttpResponseBuilder]()
           fut.complete(newResponse(200, `specLit`, @[("Content-Type", "application/json")]))
           return fut
@@ -2065,8 +2071,8 @@ macro router*(body: untyped): untyped =
         )
     else:
       stmts.add quote do:
-        proc `specHandlerName`(req: HttpRequest, pathParams: Table[string, string],
-                                queryParams: Table[string, string]): CpsFuture[HttpResponseBuilder] {.closure.} =
+        proc `specHandlerName`(req: HttpRequest, pathParams: RouteParams,
+                                queryParams: RouteParams): CpsFuture[HttpResponseBuilder] {.closure.} =
           let fut = newCpsFuture[HttpResponseBuilder]()
           fut.complete(newResponse(200, `specLit`, @[("Content-Type", "application/json")]))
           return fut
@@ -2116,8 +2122,8 @@ macro router*(body: untyped): untyped =
         appState: `appStateNode`,
         templateRenderer: `templateRendererNode`,
         notFoundHandler: proc(req: HttpRequest): CpsFuture[HttpResponseBuilder] {.closure.} =
-          let emptyPp = initTable[string, string]()
-          let emptyQp = initTable[string, string]()
+          let emptyPp = RouteParams()
+          let emptyQp = RouteParams()
           `nfSym`(req, emptyPp, emptyQp)
       )
 
@@ -2137,12 +2143,12 @@ macro router*(body: untyped): untyped =
           appState: `appStateNode`,
           templateRenderer: `templateRendererNode`,
           notFoundHandler: proc(req: HttpRequest): CpsFuture[HttpResponseBuilder] {.closure.} =
-            let emptyPp = initTable[string, string]()
-            let emptyQp = initTable[string, string]()
+            let emptyPp = RouteParams()
+            let emptyQp = RouteParams()
             `nfSym`(req, emptyPp, emptyQp),
           errorHandler: proc(req: HttpRequest, err: ref CatchableError): CpsFuture[HttpResponseBuilder] {.closure.} =
-            let emptyPp = initTable[string, string]()
-            let emptyQp = initTable[string, string]()
+            let emptyPp = RouteParams()
+            let emptyQp = RouteParams()
             `ehSym`(req, err, emptyPp, emptyQp)
         )
     else:
@@ -2157,8 +2163,8 @@ macro router*(body: untyped): untyped =
           appState: `appStateNode`,
           templateRenderer: `templateRendererNode`,
           errorHandler: proc(req: HttpRequest, err: ref CatchableError): CpsFuture[HttpResponseBuilder] {.closure.} =
-            let emptyPp = initTable[string, string]()
-            let emptyQp = initTable[string, string]()
+            let emptyPp = RouteParams()
+            let emptyQp = RouteParams()
             `ehSym`(req, err, emptyPp, emptyQp)
         )
 

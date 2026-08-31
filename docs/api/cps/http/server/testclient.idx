@@ -1,18 +1,18 @@
 nimTitle	testclient	cps/http/server/testclient.html	module cps/http/server/testclient		0
 nim	TestClient	cps/http/server/testclient.html#TestClient	object TestClient		14
 nim	newTestClient	cps/http/server/testclient.html#newTestClient,HttpHandler	proc newTestClient(handler: HttpHandler): TestClient		17
-nim	request	cps/http/server/testclient.html#request,TestClient,string,string,string,seq[]	proc request(client: TestClient; meth: string; path: string; body: string = "";\n        headers: seq[(string, string)] = @[]): CpsFuture[HttpResponseBuilder]		33
-nim	get	cps/http/server/testclient.html#get,TestClient,string,seq[]	proc get(client: TestClient; path: string; headers: seq[(string, string)] = @[]): CpsFuture[\n    HttpResponseBuilder]		40
-nim	post	cps/http/server/testclient.html#post,TestClient,string,string,seq[]	proc post(client: TestClient; path: string; body: string = "";\n     headers: seq[(string, string)] = @[]): CpsFuture[HttpResponseBuilder]		45
-nim	put	cps/http/server/testclient.html#put,TestClient,string,string,seq[]	proc put(client: TestClient; path: string; body: string = "";\n    headers: seq[(string, string)] = @[]): CpsFuture[HttpResponseBuilder]		50
-nim	delete	cps/http/server/testclient.html#delete,TestClient,string,seq[]	proc delete(client: TestClient; path: string; headers: seq[(string, string)] = @[]): CpsFuture[\n    HttpResponseBuilder]		55
-nim	patch	cps/http/server/testclient.html#patch,TestClient,string,string,seq[]	proc patch(client: TestClient; path: string; body: string = "";\n      headers: seq[(string, string)] = @[]): CpsFuture[HttpResponseBuilder]		60
-nim	head	cps/http/server/testclient.html#head,TestClient,string,seq[]	proc head(client: TestClient; path: string; headers: seq[(string, string)] = @[]): CpsFuture[\n    HttpResponseBuilder]		65
-nim	options	cps/http/server/testclient.html#options,TestClient,string,seq[]	proc options(client: TestClient; path: string; headers: seq[(string, string)] = @[]): CpsFuture[\n    HttpResponseBuilder]		70
-nim	runRequest	cps/http/server/testclient.html#runRequest,TestClient,string,string,string,seq[]	proc runRequest(client: TestClient; meth: string; path: string; body: string = "";\n           headers: seq[(string, string)] = @[]): HttpResponseBuilder		75
-nim	assertStatus	cps/http/server/testclient.html#assertStatus,HttpResponseBuilder,int	proc assertStatus(resp: HttpResponseBuilder; expected: int)		89
-nim	assertBody	cps/http/server/testclient.html#assertBody,HttpResponseBuilder,string	proc assertBody(resp: HttpResponseBuilder; expected: string)		95
-nim	assertBodyContains	cps/http/server/testclient.html#assertBodyContains,HttpResponseBuilder,string	proc assertBodyContains(resp: HttpResponseBuilder; substring: string)		101
-nim	assertHeader	cps/http/server/testclient.html#assertHeader,HttpResponseBuilder,string,string	proc assertHeader(resp: HttpResponseBuilder; name: string; expected: string)		107
-nim	assertHeaderContains	cps/http/server/testclient.html#assertHeaderContains,HttpResponseBuilder,string,string	proc assertHeaderContains(resp: HttpResponseBuilder; name: string; substring: string)		119
-nim	assertJsonBody	cps/http/server/testclient.html#assertJsonBody,HttpResponseBuilder,JsonNode	proc assertJsonBody(resp: HttpResponseBuilder; expected: JsonNode)		131
+nim	request	cps/http/server/testclient.html#request,TestClient,string,string,string,seq[]	proc request(client: TestClient; meth: string; path: string; body: string = "";\n        headers: seq[(string, string)] = @[]): CpsFuture[HttpResponseBuilder]		27
+nim	get	cps/http/server/testclient.html#get,TestClient,string,seq[]	proc get(client: TestClient; path: string; headers: seq[(string, string)] = @[]): CpsFuture[\n    HttpResponseBuilder]		34
+nim	post	cps/http/server/testclient.html#post,TestClient,string,string,seq[]	proc post(client: TestClient; path: string; body: string = "";\n     headers: seq[(string, string)] = @[]): CpsFuture[HttpResponseBuilder]		39
+nim	put	cps/http/server/testclient.html#put,TestClient,string,string,seq[]	proc put(client: TestClient; path: string; body: string = "";\n    headers: seq[(string, string)] = @[]): CpsFuture[HttpResponseBuilder]		44
+nim	delete	cps/http/server/testclient.html#delete,TestClient,string,seq[]	proc delete(client: TestClient; path: string; headers: seq[(string, string)] = @[]): CpsFuture[\n    HttpResponseBuilder]		49
+nim	patch	cps/http/server/testclient.html#patch,TestClient,string,string,seq[]	proc patch(client: TestClient; path: string; body: string = "";\n      headers: seq[(string, string)] = @[]): CpsFuture[HttpResponseBuilder]		54
+nim	head	cps/http/server/testclient.html#head,TestClient,string,seq[]	proc head(client: TestClient; path: string; headers: seq[(string, string)] = @[]): CpsFuture[\n    HttpResponseBuilder]		59
+nim	options	cps/http/server/testclient.html#options,TestClient,string,seq[]	proc options(client: TestClient; path: string; headers: seq[(string, string)] = @[]): CpsFuture[\n    HttpResponseBuilder]		64
+nim	runRequest	cps/http/server/testclient.html#runRequest,TestClient,string,string,string,seq[]	proc runRequest(client: TestClient; meth: string; path: string; body: string = "";\n           headers: seq[(string, string)] = @[]): HttpResponseBuilder		69
+nim	assertStatus	cps/http/server/testclient.html#assertStatus,HttpResponseBuilder,int	proc assertStatus(resp: HttpResponseBuilder; expected: int)		83
+nim	assertBody	cps/http/server/testclient.html#assertBody,HttpResponseBuilder,string	proc assertBody(resp: HttpResponseBuilder; expected: string)		89
+nim	assertBodyContains	cps/http/server/testclient.html#assertBodyContains,HttpResponseBuilder,string	proc assertBodyContains(resp: HttpResponseBuilder; substring: string)		95
+nim	assertHeader	cps/http/server/testclient.html#assertHeader,HttpResponseBuilder,string,string	proc assertHeader(resp: HttpResponseBuilder; name: string; expected: string)		102
+nim	assertHeaderContains	cps/http/server/testclient.html#assertHeaderContains,HttpResponseBuilder,string,string	proc assertHeaderContains(resp: HttpResponseBuilder; name: string; substring: string)		114
+nim	assertJsonBody	cps/http/server/testclient.html#assertJsonBody,HttpResponseBuilder,JsonNode	proc assertJsonBody(resp: HttpResponseBuilder; expected: JsonNode)		126

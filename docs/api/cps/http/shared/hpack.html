@@ -214,6 +214,12 @@
   <li><a class="reference" href="#decodeInteger%2CopenArray%5Bbyte%5D%2Cint%2Cint" title="decodeInteger(data: openArray[byte]; offset: var int; prefixBits: int): int">decodeInteger(data: openArray[byte]; offset: var int; prefixBits: int): int</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">decodeInto
+  <li><a class="reference" href="#decodeInto%2CHpackDecoder%2CopenArray%5Bbyte%5D%2Cseq%5B%5D" title="decodeInto(dec: var HpackDecoder; data: openArray[byte];
+           headers: var seq[(string, string)])">decodeInto(dec: var HpackDecoder; data: openArray[byte];
+           headers: var seq[(string, string)])</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">decodeString
   <li><a class="reference" href="#decodeString%2CopenArray%5Bbyte%5D%2Cint" title="decodeString(data: openArray[byte]; offset: var int): string">decodeString(data: openArray[byte]; offset: var int): string</a></li>
 
@@ -222,12 +228,40 @@
   <li><a class="reference" href="#encode%2CHpackEncoder%2Cseq%5B%5D" title="encode(enc: var HpackEncoder; headers: seq[(string, string)]): seq[byte]">encode(enc: var HpackEncoder; headers: seq[(string, string)]): seq[byte]</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">encodeHeaderIntInto
+  <li><a class="reference" href="#encodeHeaderIntInto%2CHpackEncoder%2Cstring%2Cint%2Cseq%5Bbyte%5D" title="encodeHeaderIntInto(enc: var HpackEncoder; name: string; value: int;
+                    output: var seq[byte])">encodeHeaderIntInto(enc: var HpackEncoder; name: string; value: int;
+                    output: var seq[byte])</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">encodeHeaderInto
+  <li><a class="reference" href="#encodeHeaderInto%2CHpackEncoder%2Cstring%2Cstring%2Cseq%5Bbyte%5D" title="encodeHeaderInto(enc: var HpackEncoder; name, value: string;
+                 output: var seq[byte])">encodeHeaderInto(enc: var HpackEncoder; name, value: string;
+                 output: var seq[byte])</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">encodeInteger
   <li><a class="reference" href="#encodeInteger%2Cint%2Cint%2Cbyte" title="encodeInteger(value: int; prefixBits: int; firstByte: byte): seq[byte]">encodeInteger(value: int; prefixBits: int; firstByte: byte): seq[byte]</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">encodeIntegerInto
+  <li><a class="reference" href="#encodeIntegerInto%2Cint%2Cint%2Cbyte%2Cseq%5Bbyte%5D" title="encodeIntegerInto(value: int; prefixBits: int; firstByte: byte;
+                  output: var seq[byte])">encodeIntegerInto(value: int; prefixBits: int; firstByte: byte;
+                  output: var seq[byte])</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">encodeInto
+  <li><a class="reference" href="#encodeInto%2CHpackEncoder%2CopenArray%5B%5D%2Cseq%5Bbyte%5D" title="encodeInto(enc: var HpackEncoder; headers: openArray[(string, string)];
+           output: var seq[byte])">encodeInto(enc: var HpackEncoder; headers: openArray[(string, string)];
+           output: var seq[byte])</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">encodeString
   <li><a class="reference" href="#encodeString%2Cstring%2Cbool" title="encodeString(s: string; huffman: bool = false): seq[byte]">encodeString(s: string; huffman: bool = false): seq[byte]</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">encodeStringInto
+  <li><a class="reference" href="#encodeStringInto%2Cstring%2Cseq%5Bbyte%5D%2Cbool" title="encodeStringInto(s: string; output: var seq[byte]; huffman: bool = false)">encodeStringInto(s: string; output: var seq[byte]; huffman: bool = false)</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">get
@@ -468,7 +502,7 @@
     <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ValueError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
-    Decode hpack from its wire representation.
+    Decode HPACK into a newly owned header sequence.
     
   </dd>
 </div>
@@ -481,6 +515,19 @@
   <dd>
     
     Decode integer from its wire representation.
+    
+  </dd>
+</div>
+
+</div>
+<div id="decodeInto-procs-all">
+  <div id="decodeInto,HpackDecoder,openArray[byte],seq[]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#decodeInto%2CHpackDecoder%2CopenArray%5Bbyte%5D%2Cseq%5B%5D"><span class="Identifier">decodeInto</span></a><span class="Other">(</span><span class="Identifier">dec</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="hpack.html#HpackDecoder"><span class="Identifier">HpackDecoder</span></a><span class="Other">;</span> <span class="Identifier">data</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Identifier">byte</span><span class="Other">]</span><span class="Other">;</span>
+                <span class="Identifier">headers</span><span class="Other">:</span> <span class="Keyword">var</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Other">(</span><span class="Identifier">string</span><span class="Other">,</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">]</span><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ValueError</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Decode HPACK into a caller-owned sequence. Reusing its capacity avoids a fresh header-vector allocation for every message on persistent sessions.
     
   </dd>
 </div>
@@ -504,7 +551,32 @@
     <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
-    Encode hpack into its wire representation.
+    Encode HPACK into a newly owned byte sequence.
+    
+  </dd>
+</div>
+
+</div>
+<div id="encodeHeaderIntInto-procs-all">
+  <div id="encodeHeaderIntInto,HpackEncoder,string,int,seq[byte]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#encodeHeaderIntInto%2CHpackEncoder%2Cstring%2Cint%2Cseq%5Bbyte%5D"><span class="Identifier">encodeHeaderIntInto</span></a><span class="Other">(</span><span class="Identifier">enc</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="hpack.html#HpackEncoder"><span class="Identifier">HpackEncoder</span></a><span class="Other">;</span> <span class="Identifier">name</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">value</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">;</span>
+                         <span class="Identifier">output</span><span class="Other">:</span> <span class="Keyword">var</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">byte</span><span class="Other">]</span><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Append a non-indexed decimal header without materializing its value. Non-indexing is deliberate: it also avoids retaining a one-off decimal string in the dynamic table.
+    
+  </dd>
+</div>
+
+</div>
+<div id="encodeHeaderInto-procs-all">
+  <div id="encodeHeaderInto,HpackEncoder,string,string,seq[byte]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#encodeHeaderInto%2CHpackEncoder%2Cstring%2Cstring%2Cseq%5Bbyte%5D"><span class="Identifier">encodeHeaderInto</span></a><span class="Other">(</span><span class="Identifier">enc</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="hpack.html#HpackEncoder"><span class="Identifier">HpackEncoder</span></a><span class="Other">;</span> <span class="Identifier">name</span><span class="Other">,</span> <span class="Identifier">value</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span>
+                      <span class="Identifier">output</span><span class="Other">:</span> <span class="Keyword">var</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">byte</span><span class="Other">]</span><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Append one HPACK field to a caller-owned output buffer.
     
   </dd>
 </div>
@@ -516,7 +588,32 @@
     <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
-    Encode integer into its wire representation.
+    Encode integer into newly owned wire storage.
+    
+  </dd>
+</div>
+
+</div>
+<div id="encodeIntegerInto-procs-all">
+  <div id="encodeIntegerInto,int,int,byte,seq[byte]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#encodeIntegerInto%2Cint%2Cint%2Cbyte%2Cseq%5Bbyte%5D"><span class="Identifier">encodeIntegerInto</span></a><span class="Other">(</span><span class="Identifier">value</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">;</span> <span class="Identifier">prefixBits</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">;</span> <span class="Identifier">firstByte</span><span class="Other">:</span> <span class="Identifier">byte</span><span class="Other">;</span>
+                       <span class="Identifier">output</span><span class="Other">:</span> <span class="Keyword">var</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">byte</span><span class="Other">]</span><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Append an integer to caller-owned wire storage.
+    
+  </dd>
+</div>
+
+</div>
+<div id="encodeInto-procs-all">
+  <div id="encodeInto,HpackEncoder,openArray[],seq[byte]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#encodeInto%2CHpackEncoder%2CopenArray%5B%5D%2Cseq%5Bbyte%5D"><span class="Identifier">encodeInto</span></a><span class="Other">(</span><span class="Identifier">enc</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="hpack.html#HpackEncoder"><span class="Identifier">HpackEncoder</span></a><span class="Other">;</span> <span class="Identifier">headers</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Other">(</span><span class="Identifier">string</span><span class="Other">,</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">]</span><span class="Other">;</span>
+                <span class="Identifier">output</span><span class="Other">:</span> <span class="Keyword">var</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">byte</span><span class="Other">]</span><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Encode HPACK into caller-owned storage so persistent connections can reuse the output capacity between header blocks.
     
   </dd>
 </div>
@@ -529,6 +626,18 @@
   <dd>
     
     Encode string into its wire representation.
+    
+  </dd>
+</div>
+
+</div>
+<div id="encodeStringInto-procs-all">
+  <div id="encodeStringInto,string,seq[byte],bool">
+  <dt><pre><span class="Keyword">proc</span> <a href="#encodeStringInto%2Cstring%2Cseq%5Bbyte%5D%2Cbool"><span class="Identifier">encodeStringInto</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">output</span><span class="Other">:</span> <span class="Keyword">var</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">byte</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">huffman</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">)</span> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Append a string to caller-owned wire storage.
     
   </dd>
 </div>
@@ -615,7 +724,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-25 20:56:24 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-31 16:23:46 UTC</small>
       </div>
     </div>
   </div>

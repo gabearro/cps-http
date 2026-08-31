@@ -12,6 +12,20 @@ import ./types
 import ../shared/compression
 
 type
+  RouteParamEntry = tuple[name: ByteView, value: ByteView]
+
+  RouteParamsOverflow = ref object
+    entries: seq[RouteParamEntry]
+    owned: seq[string]
+
+  RouteParams* = object
+    ## Small, borrowed parameter collection. Up to two path captures live
+    ## inline; query parameters are found directly in the request target.
+    entries: array[2, RouteParamEntry]
+    count: uint8
+    query: ByteView
+    extra: RouteParamsOverflow
+
   PathSegmentKind* = enum
     pskLiteral   ## Fixed path segment, e.g. "users"
     pskParam     ## Named parameter, e.g. "{id}" or "{id:int}"
@@ -28,8 +42,8 @@ type
     of pskWildcard:
       discard
 
-  RouteHandler* = proc(req: HttpRequest, pp: Table[string, string],
-                        qp: Table[string, string]): CpsFuture[HttpResponseBuilder] {.closure.}
+  RouteHandler* = proc(req: HttpRequest, pp: RouteParams,
+                        qp: RouteParams): CpsFuture[HttpResponseBuilder] {.closure.}
 
   Middleware* = proc(req: HttpRequest, next: HttpHandler): CpsFuture[HttpResponseBuilder] {.closure.}
 
@@ -47,7 +61,11 @@ type
     tsbRedirect  ## 301 redirect to canonical form
     tsbStrip     ## Silently strip trailing slash
 
-  Router* = object
+  Router* = ref object
+    ## Compiled routers are shared, immutable dispatch plans. Keeping the plan
+    ## behind one reference is important under atomic ARC: passing a value
+    ## router through a handler otherwise deep-copies every route/segment
+    ## sequence for every request.
     routes*: seq[RouteEntry]
     globalMiddlewares*: seq[Middleware]  ## Applied to fallback responses (404/auto OPTIONS/etc.).
     notFoundHandler*: HttpHandler
@@ -63,7 +81,115 @@ type
     mediaType*: string
     quality*: float
 
-  RequestExtractionError* = object of CatchableError
+proc addParam(params: var RouteParams, name: string, value: ByteView) {.inline.} =
+  let entry = (view(name), value)
+  if int(params.count) < params.entries.len:
+    params.entries[int(params.count)] = entry
+  else:
+    if params.extra.isNil: params.extra = RouteParamsOverflow()
+    params.extra.entries.add entry
+  inc params.count
+
+proc addOwnedParam(params: var RouteParams, name: string,
+                   value: sink string) {.inline.} =
+  if params.extra.isNil: params.extra = RouteParamsOverflow()
+  params.extra.owned.add value
+  params.addParam(name, view(params.extra.owned[^1]))
+
+proc addOwnedPair(params: var RouteParams, name, value: sink string) {.inline.} =
+  if params.extra.isNil: params.extra = RouteParamsOverflow()
+  params.extra.owned.add name
+  let nameIdx = params.extra.owned.high
+  params.extra.owned.add value
+  params.addParam(params.extra.owned[nameIdx], view(params.extra.owned[^1]))
+
+proc queryParamsView*(path: ByteView): RouteParams =
+  ## Borrow the query fields in a request target, decoding only escaped input.
+  let q = path.find('?')
+  if q >= 0 and q + 1 < path.len:
+    let query = path[q + 1 ..< path.len]
+    if query.find('%') < 0 and query.find('+') < 0:
+      # The overwhelmingly common form can be searched in the request buffer.
+      result.query = query
+      return
+
+    # URL decoding necessarily creates different bytes. Keep those rare owned
+    # values in the RouteParams lifetime instead of allocating for every lookup.
+    var pos = 0
+    while pos < query.len:
+      let pairStart = pos
+      while pos < query.len and query[pos] != '&': inc pos
+      let pairEnd = pos
+      if pairEnd > pairStart:
+        var equals = pairStart
+        while equals < pairEnd and query[equals] != '=': inc equals
+        let rawName = query[pairStart ..< equals].toString()
+        let rawValue =
+          if equals < pairEnd: query[equals + 1 ..< pairEnd].toString()
+          else: ""
+        result.addOwnedPair(decodeUrl(rawName), decodeUrl(rawValue))
+      inc pos
+
+proc rawQueryValue(query: ByteView, key: string): ByteView =
+  var pos = 0
+  while pos < query.len:
+    let pairStart = pos
+    while pos < query.len and query[pos] != '&': inc pos
+    let pairEnd = pos
+    var equals = pairStart
+    while equals < pairEnd and query[equals] != '=': inc equals
+    if equals - pairStart == key.len:
+      var matched = true
+      for i in 0 ..< key.len:
+        if query[pairStart + i] != key[i]:
+          matched = false
+          break
+      if matched:
+        if equals < pairEnd:
+          return query[equals + 1 ..< pairEnd]
+        return ByteView()
+    inc pos
+
+proc `[]`*(params: RouteParams, key: string): ByteView =
+  ## Return a borrowed route or query parameter, or an empty view if absent.
+  if params.query.len > 0:
+    return rawQueryValue(params.query, key)
+  let inlineCount = min(int(params.count), params.entries.len)
+  for i in 0 ..< inlineCount:
+    if params.entries[i].name == key: return params.entries[i].value
+  if not params.extra.isNil:
+    for entry in params.extra.entries:
+      if entry.name == key: return entry.value
+
+proc contains*(params: RouteParams, key: string): bool =
+  ## Return whether the borrowed parameter collection contains `key`.
+  if params.query.len > 0:
+    var pos = 0
+    while pos < params.query.len:
+      let pairStart = pos
+      while pos < params.query.len and params.query[pos] != '&': inc pos
+      var equals = pairStart
+      while equals < pos and params.query[equals] != '=': inc equals
+      if equals - pairStart == key.len:
+        var matched = true
+        for i in 0 ..< key.len:
+          if params.query[pairStart + i] != key[i]: matched = false
+        if matched: return true
+      inc pos
+    return false
+  let inlineCount = min(int(params.count), params.entries.len)
+  for i in 0 ..< inlineCount:
+    if params.entries[i].name == key: return true
+  if not params.extra.isNil:
+    for entry in params.extra.entries:
+      if entry.name == key: return true
+
+proc getOrDefault*(params: RouteParams, key: string,
+                   default = ByteView()): ByteView {.inline.} =
+  ## Return a borrowed parameter or `default` when the key is absent.
+  if key in params: params[key] else: default
+
+type RequestExtractionError* = object of CatchableError
     statusCode*: int
 
 proc raiseRequestExtractionError*(statusCode: int, msg: string) {.noreturn.} =
@@ -168,6 +294,46 @@ proc validateParamType(decodedPart: string, paramType: string): bool =
   else:
     return false
 
+proc validateParamType(part: ByteView, paramType: string): bool =
+  case paramType
+  of "int":
+    if part.len == 0: return false
+    var i = if part[0] in {'+', '-'}: 1 else: 0
+    if i == part.len: return false
+    while i < part.len:
+      if part[i] notin Digits: return false
+      inc i
+    true
+  of "float":
+    try:
+      discard parseFloat(part.toString())
+      true
+    except ValueError:
+      false
+  of "uuid":
+    if part.len != 36: return false
+    for i, c in part:
+      if i in {8, 13, 18, 23}:
+        if c != '-': return false
+      elif c notin HexDigits: return false
+    true
+  of "alpha":
+    if part.len == 0: return false
+    for c in part:
+      if c notin Letters: return false
+    true
+  of "alnum":
+    if part.len == 0: return false
+    for c in part:
+      if c notin Letters + Digits: return false
+    true
+  of "bool":
+    part == "true" or part == "false" or part == "1" or part == "0" or
+      eqCaseInsensitive(part, "yes") or eqCaseInsensitive(part, "no") or
+      eqCaseInsensitive(part, "on") or eqCaseInsensitive(part, "off")
+  of "": true
+  else: false
+
 proc decodeUrlIfNeeded(value: string): string {.inline.} =
   ## Preserve the caller's string when URL decoding cannot change it. This is
   ## the common route/query case and avoids allocating an identical copy.
@@ -177,7 +343,7 @@ proc decodeUrlIfNeeded(value: string): string {.inline.} =
   value
 
 proc matchRouteWithParts*(segments: seq[PathSegment], parts: seq[string],
-                          params: var Table[string, string]): bool =
+                          params: var RouteParams): bool =
   ## Match pre-split path parts against route segments. Avoids re-splitting.
   if segments.len == 0 and parts.len == 0:
     return true
@@ -197,7 +363,10 @@ proc matchRouteWithParts*(segments: seq[PathSegment], parts: seq[string],
           return false
         if not validateParamType(decodedPart, segments[i].paramType):
           return false
-        params[segments[i].paramName] = decodedPart
+        if decodedPart.len == parts[i].len and decodedPart == parts[i]:
+          params.addParam(segments[i].paramName, view(parts[i]))
+        else:
+          params.addOwnedParam(segments[i].paramName, decodedPart)
       of pskWildcard:
         discard
     return true
@@ -228,15 +397,18 @@ proc matchRouteWithParts*(segments: seq[PathSegment], parts: seq[string],
     of pskParam:
       if not validateParamType(decodedPart, segments[i].paramType):
         return false
-      params[segments[i].paramName] = decodedPart
+      if decodedPart.len == parts[i].len and decodedPart == parts[i]:
+        params.addParam(segments[i].paramName, view(parts[i]))
+      else:
+        params.addOwnedParam(segments[i].paramName, decodedPart)
     of pskWildcard:
       return true
 
   return true
 
-proc matchRoute*(segments: seq[PathSegment], path: string): (bool, Table[string, string]) =
+proc matchRoute*(segments: seq[PathSegment], path: string): (bool, RouteParams) =
   ## Match a request path against route segments. Returns (matched, params).
-  var params = initTable[string, string]()
+  var params: RouteParams
   let cleaned = path.strip(chars = {'/'})
   var parts: seq[string]
   if cleaned.len > 0:
@@ -299,6 +471,10 @@ proc parseFormBody*(body: string): Table[string, string] =
     else:
       result[decodeUrlIfNeeded(pair)] = ""
 
+proc parseFormBody*(body: ByteView): Table[string, string] {.inline.} =
+  ## Form decoding creates owned decoded values by definition.
+  parseFormBody(body.toString())
+
 # ============================================================
 # JSON body parsing
 # ============================================================
@@ -306,6 +482,10 @@ proc parseFormBody*(body: string): Table[string, string] =
 proc parseJsonBody*(body: string): JsonNode =
   ## Parse JSON from request body. Raises on invalid JSON.
   parseJson(body)
+
+proc parseJsonBody*(body: ByteView): JsonNode {.inline.} =
+  ## The stdlib JSON parser consumes an owned string.
+  parseJson(body.toString())
 
 proc parseIntParam(value: string, source: string, key: string): int =
   if value.len == 0:
@@ -331,77 +511,77 @@ proc parseBoolParam(value: string, source: string, key: string): bool =
   except ValueError:
     raiseRequestExtractionError(400, "Invalid " & source & " parameter '" & key & "'")
 
-proc pathParamValue*(pp: Table[string, string], key: string): string =
+proc pathParamValue*(pp: RouteParams, key: string): ByteView =
   ## Return a required path parameter, raising 400 when missing.
   if key notin pp:
     raiseRequestExtractionError(400, "Missing path parameter: " & key)
   result = pp[key]
 
-proc pathParamInt*(pp: Table[string, string], key: string): int =
+proc pathParamInt*(pp: RouteParams, key: string): int =
   ## Parse a required path parameter as int (400 on invalid/missing).
-  parseIntParam(pathParamValue(pp, key), "path", key)
+  parseIntParam(pathParamValue(pp, key).toString(), "path", key)
 
-proc pathParamFloat*(pp: Table[string, string], key: string): float =
+proc pathParamFloat*(pp: RouteParams, key: string): float =
   ## Parse a required path parameter as float (400 on invalid/missing).
-  parseFloatParam(pathParamValue(pp, key), "path", key)
+  parseFloatParam(pathParamValue(pp, key).toString(), "path", key)
 
-proc pathParamBool*(pp: Table[string, string], key: string): bool =
+proc pathParamBool*(pp: RouteParams, key: string): bool =
   ## Parse a required path parameter as bool (400 on invalid/missing).
-  parseBoolParam(pathParamValue(pp, key), "path", key)
+  parseBoolParam(pathParamValue(pp, key).toString(), "path", key)
 
-proc queryParamRequired*(qp: Table[string, string], key: string): string =
+proc queryParamRequired*(qp: RouteParams, key: string): ByteView =
   ## Return a required query parameter, raising 400 when missing.
   if key notin qp:
     raiseRequestExtractionError(400, "Missing query parameter: " & key)
   result = qp[key]
 
-proc queryParamInt*(qp: Table[string, string], key: string): int =
+proc queryParamInt*(qp: RouteParams, key: string): int =
   ## Parse a required query parameter as int (400 on invalid/missing).
-  parseIntParam(queryParamRequired(qp, key), "query", key)
+  parseIntParam(queryParamRequired(qp, key).toString(), "query", key)
 
-proc queryParamInt*(qp: Table[string, string], key: string, defaultVal: int): int =
+proc queryParamInt*(qp: RouteParams, key: string, defaultVal: int): int =
   ## Parse a query parameter as int, falling back to `defaultVal` when missing.
   if key notin qp or qp[key].len == 0:
     return defaultVal
-  parseIntParam(qp[key], "query", key)
+  parseIntParam(qp[key].toString(), "query", key)
 
-proc queryParamInt*(qp: Table[string, string], key: string, defaultVal: string): int =
+proc queryParamInt*(qp: RouteParams, key: string, defaultVal: string): int =
   ## Parse a query parameter as int, using a string default when missing.
   if key notin qp or qp[key].len == 0:
     return parseIntParam(defaultVal, "query", key)
-  parseIntParam(qp[key], "query", key)
+  parseIntParam(qp[key].toString(), "query", key)
 
-proc queryParamFloat*(qp: Table[string, string], key: string): float =
+proc queryParamFloat*(qp: RouteParams, key: string): float =
   ## Parse a required query parameter as float (400 on invalid/missing).
-  parseFloatParam(queryParamRequired(qp, key), "query", key)
+  parseFloatParam(queryParamRequired(qp, key).toString(), "query", key)
 
-proc queryParamFloat*(qp: Table[string, string], key: string, defaultVal: float): float =
+proc queryParamFloat*(qp: RouteParams, key: string, defaultVal: float): float =
   ## Parse a query parameter as float, falling back to `defaultVal` when missing.
   if key notin qp or qp[key].len == 0:
     return defaultVal
-  parseFloatParam(qp[key], "query", key)
+  parseFloatParam(qp[key].toString(), "query", key)
 
-proc queryParamFloat*(qp: Table[string, string], key: string, defaultVal: string): float =
+proc queryParamFloat*(qp: RouteParams, key: string, defaultVal: string): float =
   ## Parse a query parameter as float, using a string default when missing.
   if key notin qp or qp[key].len == 0:
     return parseFloatParam(defaultVal, "query", key)
-  parseFloatParam(qp[key], "query", key)
+  parseFloatParam(qp[key].toString(), "query", key)
 
-proc queryParamBool*(qp: Table[string, string], key: string): bool =
+proc queryParamBool*(qp: RouteParams, key: string): bool =
   ## Parse a required query parameter as bool (400 on invalid/missing).
-  parseBoolParam(queryParamRequired(qp, key), "query", key)
+  parseBoolParam(queryParamRequired(qp, key).toString(), "query", key)
 
-proc queryParamBool*(qp: Table[string, string], key: string, defaultVal: bool): bool =
+proc queryParamBool*(qp: RouteParams, key: string, defaultVal: bool): bool =
   ## Parse a query parameter as bool, falling back to `defaultVal` when missing.
   if key notin qp or qp[key].len == 0:
     return defaultVal
-  parseBoolParam(qp[key], "query", key)
+  parseBoolParam(qp[key].toString(), "query", key)
 
-proc queryParamBool*(qp: Table[string, string], key: string, defaultVal: string): bool =
+proc queryParamBool*(qp: RouteParams, key: string, defaultVal: string): bool =
   ## Parse a query parameter as bool, using a string default when missing.
   if key notin qp or qp[key].len == 0:
     return parseBoolParam(defaultVal, "query", key)
-  parseBoolParam(qp[key], "query", key)
+  parseBoolParam(qp[key].toString(), "query", key)
 
 # ============================================================
 # Request extraction helpers
@@ -422,10 +602,10 @@ proc extractClientIp*(req: HttpRequest): string =
   if trustedProxy:
     let forwarded = req.getHeader("x-forwarded-for")
     if forwarded.len > 0:
-      return forwarded.split(',')[0].strip()
+      return forwarded.toString().split(',')[0].strip()
     let realIp = req.getHeader("x-real-ip")
     if realIp.len > 0:
-      return realIp
+      return realIp.toString()
 
   if remoteIp.len > 0:
     return remoteIp
@@ -434,17 +614,19 @@ proc extractClientIp*(req: HttpRequest): string =
 proc extractBearerToken*(req: HttpRequest): string =
   ## Extract Bearer token from Authorization header. Returns "" if not present.
   let auth = req.getHeader("authorization")
-  if auth.toLowerAscii.startsWith("bearer "):
-    return auth[7 .. ^1].strip()
+  let ownedAuth = auth.toString()
+  if ownedAuth.toLowerAscii.startsWith("bearer "):
+    return ownedAuth[7 .. ^1].strip()
   return ""
 
 proc parseBasicAuth*(req: HttpRequest): (string, string) =
   ## Parse Basic auth credentials from Authorization header.
   ## Returns (username, password). Returns ("", "") if not present or invalid.
   let auth = req.getHeader("authorization")
-  if not auth.toLowerAscii.startsWith("basic "):
+  let ownedAuth = auth.toString()
+  if not ownedAuth.toLowerAscii.startsWith("basic "):
     return ("", "")
-  let encoded = auth[6 .. ^1].strip()
+  let encoded = ownedAuth[6 .. ^1].strip()
   try:
     let decoded = base64.decode(encoded)
     let colonIdx = decoded.find(':')
@@ -466,12 +648,24 @@ proc escapeHtml*(s: string): string =
     of '\'': result.add "&#x27;"
     else: result.add c
 
+proc escapeHtml*(s: ByteView): string =
+  ## Escape borrowed bytes directly into the owned encoded result.
+  result = newStringOfCap(s.len)
+  for c in s:
+    case c
+    of '&': result.add "&amp;"
+    of '<': result.add "&lt;"
+    of '>': result.add "&gt;"
+    of '"': result.add "&quot;"
+    of '\'': result.add "&#x27;"
+    else: result.add c
+
 proc checkEtag*(req: HttpRequest, etag: string): bool =
   ## Check If-None-Match header against an ETag. Returns true if client has fresh copy.
   let ifNoneMatch = req.getHeader("if-none-match")
   if ifNoneMatch.len > 0:
     # Handle comma-separated list of ETags
-    for part in ifNoneMatch.split(','):
+    for part in ifNoneMatch.toString().split(','):
       if part.strip() == etag or part.strip() == "*":
         return true
   return false
@@ -536,6 +730,11 @@ proc negotiateContentType*(acceptHeader: string, available: seq[string]): string
         if availLower.startsWith(prefix & "/"):
           return available[i]
   return ""
+
+proc negotiateContentType*(acceptHeader: ByteView,
+                           available: seq[string]): string {.inline.} =
+  ## Negotiate an owned content type from a borrowed Accept header.
+  negotiateContentType(acceptHeader.toString(), available)
 
 # ============================================================
 # Middleware chaining
@@ -636,7 +835,7 @@ proc getCookie*(req: HttpRequest, name: string): string =
   let cookieHeader = req.getHeader("cookie")
   if cookieHeader.len == 0:
     return ""
-  for pair in cookieHeader.split(';'):
+  for pair in cookieHeader.toString().split(';'):
     let trimmed = pair.strip()
     let eqIdx = trimmed.find('=')
     if eqIdx >= 0:
@@ -836,7 +1035,8 @@ proc downloadResponse*(filePath: string, filename: string = ""): CpsFuture[HttpR
 
 proc listRoutes*(router: Router): string =
   ## Return a human-readable listing of all routes.
-  for route in router.routes:
+  for i in 0 ..< router.routes.len:
+    let route {.cursor.} = router.routes[i]
     let meth = if route.meth == "*": "ANY" else: route.meth
     let pattern = segmentsToPattern(route.segments)
     let name = if route.name.len > 0: " [" & route.name & "]" else: ""
@@ -853,7 +1053,8 @@ proc setAppState*(router: var Router, state: RootRef) =
 proc urlFor*(router: Router, name: string,
               params: Table[string, string] = initTable[string, string]()): string =
   ## Generate a URL for a named route by filling in path parameters.
-  for route in router.routes:
+  for i in 0 ..< router.routes.len:
+    let route {.cursor.} = router.routes[i]
     if route.name == name:
       result = ""
       for seg in route.segments:
@@ -877,8 +1078,8 @@ proc urlFor*(router: Router, name: string,
 # Router dispatch
 # ============================================================
 
-proc matchFastRoute(segments: seq[PathSegment], path: string, pathEnd: int,
-                    params: var Table[string, string]): bool {.inline.} =
+proc matchFastRoute(segments: seq[PathSegment], path: ByteView, pathEnd: int,
+                    params: var RouteParams): bool {.inline.} =
   ## Match literal and required-parameter routes against the raw path without
   ## allocating a split-path sequence. Complex routes fall back to the full
   ## matcher. `pathEnd` excludes the query string.
@@ -890,7 +1091,7 @@ proc matchFastRoute(segments: seq[PathSegment], path: string, pathEnd: int,
 
   var pos = 1
   for i in 0 ..< segments.len:
-    let segment = segments[i]
+    let segment {.cursor.} = segments[i]
     if segment.kind == pskWildcard or
         (segment.kind == pskParam and segment.optional):
       return false
@@ -910,12 +1111,14 @@ proc matchFastRoute(segments: seq[PathSegment], path: string, pathEnd: int,
         if path[partStart + j] != literal[j]:
           return false
     of pskParam:
-      let decoded = decodeUrlIfNeeded(path[partStart ..< pos])
-      if not validateParamType(decoded, segment.paramType):
-        return false
-      if params.len == 0:
-        params = initTable[string, string](segments.len)
-      params[segment.paramName] = decoded
+      let raw = path[partStart ..< pos]
+      if raw.find('%') >= 0 or raw.find('+') >= 0:
+        let decoded = decodeUrl(raw.toString())
+        if not validateParamType(decoded, segment.paramType): return false
+        params.addOwnedParam(segment.paramName, decoded)
+      else:
+        if not validateParamType(raw, segment.paramType): return false
+        params.addParam(segment.paramName, raw)
     of pskWildcard:
       return false
 
@@ -943,14 +1146,13 @@ proc dispatch*(router: Router, req: HttpRequest): CpsFuture[HttpResponseBuilder]
     let qIdx = req.path.find('?')
     let pathEnd = if qIdx >= 0: qIdx else: req.path.len
     for i in 0 ..< router.routes.len:
-      let route = router.routes[i]
+      let route {.cursor.} = router.routes[i]
       if route.meth != req.meth and route.meth != "*": continue
       if route.middlewares.len > 0: continue
-      var pathParams: Table[string, string]
+      var pathParams: RouteParams
       if matchFastRoute(route.segments, req.path, pathEnd, pathParams):
         # Direct handler call; literal routes need no parameter table allocation.
-        var emptyQueryParams: Table[string, string]
-        let qp = if qIdx >= 0: parseQueryString(req.path) else: emptyQueryParams
+        let qp = if qIdx >= 0: queryParamsView(req.path) else: RouteParams()
         var resultFut: CpsFuture[HttpResponseBuilder]
         if router.appState.isNil and router.templateRenderer.isNil:
           # Skip HttpRequest copy when no enrichment needed
@@ -989,26 +1191,28 @@ proc dispatch*(router: Router, req: HttpRequest): CpsFuture[HttpResponseBuilder]
   if router.methodOverrideEnabled:
     let overrideHeader = req.getHeader("x-http-method-override")
     if overrideHeader.len > 0:
-      req.meth = overrideHeader.toUpperAscii
+      req.setMethod(overrideHeader.toString().toUpperAscii)
     elif req.meth == "POST":
       let ct = req.getHeader("content-type")
-      if ct.toLowerAscii.startsWith("application/x-www-form-urlencoded"):
-        let form = parseFormBody(req.body)
+      if ct.toString().toLowerAscii.startsWith("application/x-www-form-urlencoded"):
+        let form = parseFormBody(req.body.toString())
         let methodVal = form.getOrDefault("_method")
         if methodVal.len > 0:
-          req.meth = methodVal.toUpperAscii
+          req.setMethod(methodVal.toUpperAscii)
 
   # Pre-compute path info once
   let qIdx = req.path.find('?')
-  let cleanPath = if qIdx >= 0: req.path[0 ..< qIdx] else: req.path
+  let cleanPath =
+    if qIdx >= 0: req.path[0 ..< qIdx].toString()
+    else: req.path.toString()
   let pathParts = splitPathParts(cleanPath)
 
   # Lazy query params — only parsed when a route is actually matched
   var qpParsed = false
-  var qp: Table[string, string]
-  proc getQp(): Table[string, string] =
+  var qp: RouteParams
+  proc getQp(): RouteParams =
     if not qpParsed:
-      qp = parseQueryString(req.path)
+      qp = queryParamsView(req.path)
       qpParsed = true
     qp
 
@@ -1066,8 +1270,8 @@ proc dispatch*(router: Router, req: HttpRequest): CpsFuture[HttpResponseBuilder]
 
   # Helper: invoke a route with full middleware chain + error recovery
   proc invokeRoute(route: RouteEntry, r: HttpRequest,
-                    pp: Table[string, string],
-                    capturedQp: Table[string, string]): CpsFuture[HttpResponseBuilder] =
+                    pp: RouteParams,
+                    capturedQp: RouteParams): CpsFuture[HttpResponseBuilder] =
     let capturedHandler = route.handler
     let inner: HttpHandler = proc(r2: HttpRequest): CpsFuture[HttpResponseBuilder] {.closure.} =
       capturedHandler(r2, pp, capturedQp)
@@ -1084,8 +1288,9 @@ proc dispatch*(router: Router, req: HttpRequest): CpsFuture[HttpResponseBuilder]
     invokeWithRecovery(fallbackMw, finalHandler, req)
 
   proc allowMethodsForPath(parts: seq[string]): seq[string] =
-    for route in router.routes:
-      var pp = initTable[string, string]()
+    for i in 0 ..< router.routes.len:
+      let route {.cursor.} = router.routes[i]
+      var pp: RouteParams
       if not matchRouteWithParts(route.segments, parts, pp):
         continue
       if route.meth == "*":
@@ -1102,12 +1307,13 @@ proc dispatch*(router: Router, req: HttpRequest): CpsFuture[HttpResponseBuilder]
   #    Run through fallback middleware chain for consistent headers/logging.
   if router.trailingSlash == tsbRedirect and cleanPath.len > 1 and cleanPath.endsWith("/"):
     let altPath = cleanPath[0..^2]
-    for route in router.routes:
+    for i in 0 ..< router.routes.len:
+      let route {.cursor.} = router.routes[i]
       if route.meth != req.meth and route.meth != "*": continue
       let (matched, _) = matchRoute(route.segments, altPath)
       if matched:
         let redir = if req.path.find('?') >= 0:
-          altPath & req.path[req.path.find('?') .. ^1]
+          altPath & req.path.toString()[req.path.find('?') .. ^1]
         else: altPath
         let redirectHandler: HttpHandler =
           proc(_: HttpRequest): CpsFuture[HttpResponseBuilder] {.closure.} =
@@ -1121,9 +1327,9 @@ proc dispatch*(router: Router, req: HttpRequest): CpsFuture[HttpResponseBuilder]
     # HEAD auto-generation: fall back to GET routes
     if req.meth == "HEAD":
       for i in 0 ..< router.routes.len:
-        let route = router.routes[i]
+        let route {.cursor.} = router.routes[i]
         if route.meth != "GET": continue
-        var pp = initTable[string, string]()
+        var pp: RouteParams
         let matched = matchRouteWithParts(route.segments, pathParts, pp)
         if matched:
           let getFut = invokeRoute(route, req, pp, getQp())
@@ -1139,7 +1345,7 @@ proc dispatch*(router: Router, req: HttpRequest): CpsFuture[HttpResponseBuilder]
                   filtered.add (k, v)
               resp.headers = filtered
               resp.headers.add ("Content-Length", $resp.body.len)
-              resp.body = ""
+              resp.clearBody()
               resultFut.complete(resp)
           )
           return resultFut
@@ -1147,8 +1353,9 @@ proc dispatch*(router: Router, req: HttpRequest): CpsFuture[HttpResponseBuilder]
     # OPTIONS auto-generation: collect allowed methods
     if req.meth == "OPTIONS":
       var methods: seq[string]
-      for route in router.routes:
-        var pp = initTable[string, string]()
+      for i in 0 ..< router.routes.len:
+        let route {.cursor.} = router.routes[i]
+        var pp: RouteParams
         if matchRouteWithParts(route.segments, pathParts, pp):
           if route.meth == "*":
             methods = @["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]
@@ -1174,7 +1381,7 @@ proc dispatch*(router: Router, req: HttpRequest): CpsFuture[HttpResponseBuilder]
       let hasTrailing = cleanPath.endsWith("/") and cleanPath.len > 1
       let altPath = if hasTrailing: cleanPath[0..^2] else: cleanPath & "/"
       for i in 0 ..< router.routes.len:
-        let route = router.routes[i]
+        let route {.cursor.} = router.routes[i]
         if route.meth != req.meth and route.meth != "*": continue
         let (matched, pp) = matchRoute(route.segments, altPath)
         if matched:
@@ -1205,10 +1412,11 @@ proc dispatch*(router: Router, req: HttpRequest): CpsFuture[HttpResponseBuilder]
     return invokeFallback(defaultNotFound)
 
   # 1. Collect all matching routes for this method+path
-  var matchedRoutes: seq[(RouteEntry, Table[string, string])]
-  for route in router.routes:
+  var matchedRoutes: seq[(RouteEntry, RouteParams)]
+  for i in 0 ..< router.routes.len:
+    let route {.cursor.} = router.routes[i]
     if route.meth != req.meth and route.meth != "*": continue
-    var pp = initTable[string, string]()
+    var pp: RouteParams
     if matchRouteWithParts(route.segments, pathParts, pp):
       matchedRoutes.add (route, pp)
 
@@ -1260,14 +1468,14 @@ proc mountRouter*(parent: var Router, prefix: string, child: Router,
   let capturedChild = child
   let capturedPrefix = prefix.strip(chars = {'/'})
   let pattern = "/" & capturedPrefix & "/*"
-  let handler: RouteHandler = proc(req: HttpRequest, pp: Table[string, string],
-                                    qp: Table[string, string]): CpsFuture[HttpResponseBuilder] {.closure.} =
+  let handler: RouteHandler = proc(req: HttpRequest, pp: RouteParams,
+                                    qp: RouteParams): CpsFuture[HttpResponseBuilder] {.closure.} =
     var modReq = req
     let prefix = "/" & capturedPrefix
     if modReq.path.startsWith(prefix):
-      modReq.path = modReq.path[prefix.len .. ^1]
+      modReq.path = modReq.path[prefix.len ..< modReq.path.len]
       if modReq.path.len == 0:
-        modReq.path = "/"
+        modReq.path = view("/")
     dispatch(capturedChild, modReq)
 
   parent.routes.add RouteEntry(
@@ -1283,14 +1491,14 @@ proc mountHandler*(parent: var Router, prefix: string, handler: HttpHandler,
   let capturedHandler = handler
   let capturedPrefix = prefix.strip(chars = {'/'})
   let pattern = "/" & capturedPrefix & "/*"
-  let routeHandler: RouteHandler = proc(req: HttpRequest, pp: Table[string, string],
-                                         qp: Table[string, string]): CpsFuture[HttpResponseBuilder] {.closure.} =
+  let routeHandler: RouteHandler = proc(req: HttpRequest, pp: RouteParams,
+                                         qp: RouteParams): CpsFuture[HttpResponseBuilder] {.closure.} =
     var modReq = req
     let prefix = "/" & capturedPrefix
     if modReq.path.startsWith(prefix):
-      modReq.path = modReq.path[prefix.len .. ^1]
+      modReq.path = modReq.path[prefix.len ..< modReq.path.len]
       if modReq.path.len == 0:
-        modReq.path = "/"
+        modReq.path = view("/")
     capturedHandler(modReq)
 
   parent.routes.add RouteEntry(
@@ -1361,7 +1569,7 @@ proc corsMiddleware*(allowOrigins: seq[string],
         # Wildcard + credentials must reflect concrete origin.
         if reqOrigin.len > 0:
           originAllowed = true
-          matchedOrigin = reqOrigin
+          matchedOrigin = reqOrigin.toString()
           needsVaryOrigin = true
       else:
         originAllowed = true
@@ -1370,7 +1578,7 @@ proc corsMiddleware*(allowOrigins: seq[string],
       for o in capturedOrigins:
         if o == reqOrigin:
           originAllowed = true
-          matchedOrigin = reqOrigin
+          matchedOrigin = reqOrigin.toString()
           break
 
     if not originAllowed:
@@ -1388,7 +1596,7 @@ proc corsMiddleware*(allowOrigins: seq[string],
         # Reflect request headers
         let reqHeaders = req.getHeader("access-control-request-headers")
         if reqHeaders.len > 0:
-          headers.add ("Access-Control-Allow-Headers", reqHeaders)
+          headers.add ("Access-Control-Allow-Headers", reqHeaders.toString())
       if capturedCredentials:
         headers.add ("Access-Control-Allow-Credentials", "true")
       if needsVaryOrigin:
@@ -1464,11 +1672,10 @@ proc requestIdMiddleware*(headerName: string = "X-Request-ID"): Middleware =
     var modReq = req
     if modReq.context.isNil:
       modReq.context = newTable[string, string]()
-    var reqId = modReq.getHeader(capturedHeader)
+    var reqId = modReq.getHeader(capturedHeader).toString()
     if reqId.len == 0:
       let idNum = requestIdCounter.fetchAdd(1'u64, moRelaxed) + 1'u64
       reqId = "req-" & $idNum
-      modReq.headers.add (capturedHeader, reqId)
     modReq.context[capturedHeader] = reqId
     let fut = next(modReq)
     let resultFut = newCpsFuture[HttpResponseBuilder]()
@@ -1490,7 +1697,7 @@ proc bodySizeLimitMiddleware*(maxBytes: int): Middleware =
     let clHeader = req.getHeader("content-length")
     if clHeader.len > 0:
       try:
-        let cl = parseInt(clHeader)
+        let cl = parseInt(clHeader.toString())
         if cl > capturedMax:
           let fut = newCpsFuture[HttpResponseBuilder]()
           fut.complete(newResponse(413, "Payload Too Large"))
@@ -1550,7 +1757,7 @@ proc accessLogMiddleware*(format: string = "combined"): Middleware =
         let resp = fut.read()
         if capturedFormat == "combined":
           let ua = req.getHeader("user-agent")
-          echo capturedIp & " " & capturedMethod & " " & capturedPath & " " & $resp.statusCode & " " & $duration.int & "ms \"" & ua & "\""
+          echo capturedIp & " " & capturedMethod & " " & capturedPath & " " & $resp.statusCode & " " & $duration.int & "ms \"" & ua.toString() & "\""
         else:
           echo capturedIp & " " & capturedMethod & " " & capturedPath & " " & $resp.statusCode & " " & $duration.int & "ms"
         resultFut.complete(resp)
@@ -1565,15 +1772,15 @@ proc methodOverrideMiddleware*(): Middleware =
     # Check header first
     let overrideHeader = req.getHeader("x-http-method-override")
     if overrideHeader.len > 0:
-      modReq.meth = overrideHeader.toUpperAscii
+      modReq.setMethod(overrideHeader.toString().toUpperAscii)
     elif req.meth == "POST":
       # Check _method form field
       let ct = req.getHeader("content-type")
-      if ct.toLowerAscii.startsWith("application/x-www-form-urlencoded"):
-        let form = parseFormBody(req.body)
+      if ct.toString().toLowerAscii.startsWith("application/x-www-form-urlencoded"):
+        let form = parseFormBody(req.body.toString())
         let methodVal = form.getOrDefault("_method")
         if methodVal.len > 0:
-          modReq.meth = methodVal.toUpperAscii
+          modReq.setMethod(methodVal.toUpperAscii)
     return next(modReq)
 
 proc compressionMiddleware*(minBodySize: int = 256,
@@ -1620,7 +1827,7 @@ proc compressionMiddleware*(minBodySize: int = 256,
         resultFut.complete(resp)
         return
 
-      let accepted = parseAcceptEncoding(aeHeader)
+      let accepted = parseAcceptEncoding(aeHeader.toString())
       let enc = bestEncoding(accepted)
       if enc == ceIdentity:
         resultFut.complete(resp)
@@ -1628,10 +1835,10 @@ proc compressionMiddleware*(minBodySize: int = 256,
 
       # Compress
       try:
-        let compressed = compress(resp.body, enc, capturedLevel)
+        let compressed = compress(resp.body.toString(), enc, capturedLevel)
         # Only use compressed version if it's actually smaller
         if compressed.len < resp.body.len:
-          resp.body = compressed
+          resp.setBody(compressed)
           resp.headers.add ("Content-Encoding", encodingName(enc))
           resp.headers.add ("Vary", "Accept-Encoding")
           # Remove any existing Content-Length (will be recalculated)

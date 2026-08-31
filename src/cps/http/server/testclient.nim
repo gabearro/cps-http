@@ -21,14 +21,8 @@ proc newTestClient*(handler: HttpHandler): TestClient =
 proc buildRequest(meth: string, path: string, body: string,
                    headers: seq[(string, string)]): HttpRequest =
   ## Build an HttpRequest for testing.
-  HttpRequest(
-    meth: meth,
-    path: path,
-    httpVersion: "HTTP/1.1",
-    headers: headers,
-    body: body,
-    context: newTable[string, string]()
-  )
+  result = newOwnedRequest(meth, path, headers, body)
+  result.context = newTable[string, string]()
 
 proc request*(client: TestClient, meth: string, path: string,
                body: string = "",
@@ -100,9 +94,10 @@ proc assertBody*(resp: HttpResponseBuilder, expected: string) =
 
 proc assertBodyContains*(resp: HttpResponseBuilder, substring: string) =
   ## Assert that the response body contains matches the expectation.
-  if substring notin resp.body:
+  if resp.body.find(substring) < 0:
     raise newException(AssertionDefect,
-      "Expected body to contain \"" & substring & "\" but body is \"" & resp.body & "\"")
+      "Expected body to contain \"" & substring & "\" but body is \"" &
+        resp.body.toString() & "\"")
 
 proc assertHeader*(resp: HttpResponseBuilder, name: string, expected: string) =
   ## Assert that the response header matches the expectation.
@@ -130,7 +125,7 @@ proc assertHeaderContains*(resp: HttpResponseBuilder, name: string, substring: s
 
 proc assertJsonBody*(resp: HttpResponseBuilder, expected: JsonNode) =
   ## Assert that the response json body matches the expectation.
-  let actual = parseJson(resp.body)
+  let actual = parseJson(resp.body.toString())
   if actual != expected:
     raise newException(AssertionDefect,
       "Expected JSON " & $expected & " but got " & $actual)

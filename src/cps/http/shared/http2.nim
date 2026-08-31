@@ -136,16 +136,15 @@ proc serializeFrame*(frame: Http2Frame): seq[byte] =
   if frame.payload.len > 0:
     copyMem(addr result[9], unsafeAddr frame.payload[0], frame.payload.len)
 
-proc appendSerializedFrameSlice*(dest: var string,
-                                 frameType, flags: uint8,
-                                 streamId: uint32,
-                                 payload: openArray[byte],
-                                 payloadOffset, payloadLen: int) =
-  ## Append one frame from a payload slice without allocating the slice.  This
-  ## is useful for DATA fragmentation and for coalescing several frames into a
-  ## single transport write.
-  assert payloadOffset >= 0 and payloadLen >= 0 and
-    payloadOffset + payloadLen <= payload.len
+proc appendSerializedFrameMemory*(dest: var string,
+                                  frameType, flags: uint8,
+                                  streamId: uint32,
+                                  payload: pointer,
+                                  payloadLen: int) =
+  ## Append a frame directly from borrowed memory. The bytes are copied once
+  ## into the connection-owned serialized write, which is the lifetime needed
+  ## by an asynchronous HTTP/2 writer queue.
+  assert payloadLen >= 0 and (payloadLen == 0 or payload != nil)
   let start = dest.len
   let length = payloadLen.uint32
   dest.setLen(start + 9 + payloadLen)
@@ -159,7 +158,23 @@ proc appendSerializedFrameSlice*(dest: var string,
   dest[start + 7] = char((streamId shr 8) and 0xFF)
   dest[start + 8] = char(streamId and 0xFF)
   if payloadLen > 0:
-    copyMem(addr dest[start + 9], unsafeAddr payload[payloadOffset], payloadLen)
+    copyMem(addr dest[start + 9], payload, payloadLen)
+
+proc appendSerializedFrameSlice*(dest: var string,
+                                 frameType, flags: uint8,
+                                 streamId: uint32,
+                                 payload: openArray[byte],
+                                 payloadOffset, payloadLen: int) =
+  ## Append one frame from a payload slice without allocating the slice.  This
+  ## is useful for DATA fragmentation and for coalescing several frames into a
+  ## single transport write.
+  assert payloadOffset >= 0 and payloadLen >= 0 and
+    payloadOffset + payloadLen <= payload.len
+  let payloadPtr =
+    if payloadLen > 0: cast[pointer](unsafeAddr payload[payloadOffset])
+    else: nil
+  dest.appendSerializedFrameMemory(
+    frameType, flags, streamId, payloadPtr, payloadLen)
 
 proc appendSerializedFrame*(dest: var string, frame: Http2Frame) =
   ## Append a frame directly to a byte string.  This is the representation used

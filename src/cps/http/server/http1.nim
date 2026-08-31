@@ -24,6 +24,7 @@ type
     closeConn: bool
     hasConnectionClose: bool
     hasConnectionKeepAlive: bool
+    requestBytes: int
 
   Http1ServerConnection* = object
     stream*: AsyncStream
@@ -40,7 +41,7 @@ const
   H1Empty200CloseResponse =
     "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
 
-proc classifySpecialHeader(name: string): Http1SpecialHeader {.inline.} =
+proc classifySpecialHeader(name: ByteView): Http1SpecialHeader {.inline.} =
   ## Dispatch common semantic headers by length first. This keeps arbitrary
   ## extension headers on the generic path while avoiding five full
   ## case-insensitive comparisons for every header line.
@@ -95,6 +96,24 @@ proc headerHasToken(value, token: string): bool =
     if i < value.len: inc i  # skip comma
   false
 
+proc headerHasToken(value: ByteView, token: string): bool =
+  var i = 0
+  while i < value.len:
+    while i < value.len and value[i] in {' ', '\t'}: inc i
+    let start = i
+    while i < value.len and value[i] != ',': inc i
+    var tokenEnd = i
+    while tokenEnd > start and value[tokenEnd - 1] in {' ', '\t'}: dec tokenEnd
+    if tokenEnd - start == token.len:
+      var matched = true
+      for j in 0 ..< token.len:
+        if toLowerAscii(value[start + j]) != toLowerAscii(token[j]):
+          matched = false
+          break
+      if matched: return true
+    if i < value.len: inc i
+  false
+
 proc headersHaveToken(headers: openArray[(string, string)],
                       name, token: string): bool =
   for (k, v) in headers:
@@ -130,6 +149,17 @@ proc parseContentLengthValue(value: string, parsed: var int): bool =
   if n < 0 or n > BiggestInt(high(int)):
     return false
   parsed = int(n)
+  true
+
+proc parseContentLengthValue(value: ByteView, parsed: var int): bool =
+  if value.len == 0: return false
+  var n = 0
+  for ch in value:
+    if ch notin Digits: return false
+    let digit = ord(ch) - ord('0')
+    if n > (high(int) - digit) div 10: return false
+    n = n * 10 + digit
+  parsed = n
   true
 
 proc parseTransferEncodingTokens(value: string, tokens: var seq[string]): bool =
@@ -182,22 +212,28 @@ proc parseHexChunkSize(token: string, parsed: var int): bool =
   true
 
 type
+  ByteRange = object
+    start: int
+    len: int
+
   HeaderParseResult = object
     ok: bool
     statusCode: int
     errBody: string
-    meth: string
-    path: string
-    httpVersion: string
-    headers: seq[(string, string)]
+    meth: ByteRange
+    path: ByteRange
+    httpVersion: ByteRange
+    headers: ByteRange
+    headerCount: int
+    requestBytes: int
     hasConnectionClose: bool
     hasConnectionKeepAlive: bool
     parsedContentLength: int
     sawContentLength: bool
-    transferEncoding: string
+    hasChunkedTransfer: bool
     hasExpect100Continue: bool
 
-proc parseHeaderBlock(headerBlock: string, config: HttpServerConfig): HeaderParseResult =
+proc parseHeaderBlock(headerBlock: ByteView, config: HttpServerConfig): HeaderParseResult =
   ## Parse a complete header block (request line + headers) synchronously.
   ## The headerBlock does NOT include the trailing \r\n\r\n.
   if headerBlock.len == 0:
@@ -225,21 +261,24 @@ proc parseHeaderBlock(headerBlock: string, config: HttpServerConfig): HeaderPars
   if sp2 < 0 or sp2 >= lineEnd or sp2 == sp1 + 1:
     return HeaderParseResult(ok: false, statusCode: 400, errBody: "Bad Request")
 
-  result.meth = headerBlock[0 ..< sp1]
-  result.path = headerBlock[sp1 + 1 ..< sp2]
-  result.httpVersion = headerBlock[sp2 + 1 ..< lineEnd]
+  result.meth = ByteRange(start: 0, len: sp1)
+  result.path = ByteRange(start: sp1 + 1, len: sp2 - sp1 - 1)
+  result.httpVersion = ByteRange(start: sp2 + 1, len: lineEnd - sp2 - 1)
 
-  if result.meth.len == 0 or not isValidHeaderName(result.meth):
+  let meth = headerBlock[result.meth.start ..< result.meth.start + result.meth.len]
+  let path = headerBlock[result.path.start ..< result.path.start + result.path.len]
+  let httpVersion = headerBlock[result.httpVersion.start ..< result.httpVersion.start + result.httpVersion.len]
+  if meth.len == 0 or not isValidHeaderName(meth):
     return HeaderParseResult(ok: false, statusCode: 400, errBody: "Bad Request")
-  if result.path.len == 0:
+  if path.len == 0:
     return HeaderParseResult(ok: false, statusCode: 400, errBody: "Bad Request")
-  for c in result.path:
+  for c in path:
     if ord(c) < 0x21 or ord(c) == 0x7F:
       return HeaderParseResult(ok: false, statusCode: 400, errBody: "Bad Request")
-  if result.httpVersion.len == 0 or result.httpVersion.find(' ') >= 0:
+  if httpVersion.len == 0 or httpVersion.find(' ') >= 0:
     return HeaderParseResult(ok: false, statusCode: 400, errBody: "Bad Request")
-  if result.httpVersion != "HTTP/1.1" and result.httpVersion != "HTTP/1.0":
-    if result.httpVersion.startsWith("HTTP/"):
+  if httpVersion != "HTTP/1.1" and httpVersion != "HTTP/1.0":
+    if httpVersion.startsWith("HTTP/"):
       return HeaderParseResult(ok: false, statusCode: 505, errBody: "HTTP Version Not Supported")
     return HeaderParseResult(ok: false, statusCode: 400, errBody: "Bad Request")
 
@@ -248,8 +287,9 @@ proc parseHeaderBlock(headerBlock: string, config: HttpServerConfig): HeaderPars
   var totalHeaderBytes = 0
   var hostHeaderCount = 0
   var pos = lineEnd + 2  # skip past \r\n of request line
-  var expectHeader = ""
-  result.headers = newSeqOfCap[(string, string)](8)
+  var expectTokenCount = 0
+  var transferTokenCount = 0
+  let headersStart = lineEnd + 2
 
   while pos < headerBlock.len:
     # Find end of this header line
@@ -298,7 +338,9 @@ proc parseHeaderBlock(headerBlock: string, config: HttpServerConfig): HeaderPars
     var valEnd = hEnd - 1
     while valEnd >= valStart and (headerBlock[valEnd] == ' ' or headerBlock[valEnd] == '\t'):
       dec valEnd
-    let val = if valStart <= valEnd: headerBlock[valStart .. valEnd] else: ""
+    let val =
+      if valStart <= valEnd: headerBlock[valStart .. valEnd]
+      else: ByteView()
 
     if not validateHeaderPair(rawKey, val):
       return HeaderParseResult(ok: false, statusCode: 400, errBody: "Bad Request")
@@ -317,13 +359,32 @@ proc parseHeaderBlock(headerBlock: string, config: HttpServerConfig): HeaderPars
       result.sawContentLength = true
       result.parsedContentLength = parsedLen
     of h1hTransferEncoding:
-      if result.transferEncoding.len > 0:
-        result.transferEncoding.add(",")
-      result.transferEncoding.add(val)
+      var tokenStart = 0
+      while tokenStart < val.len:
+        while tokenStart < val.len and val[tokenStart] in {' ', '\t'}: inc tokenStart
+        var tokenEnd = tokenStart
+        while tokenEnd < val.len and val[tokenEnd] != ',': inc tokenEnd
+        var trimmedEnd = tokenEnd
+        while trimmedEnd > tokenStart and val[trimmedEnd - 1] in {' ', '\t'}: dec trimmedEnd
+        let token = val[tokenStart .. trimmedEnd - 1]
+        if token.len == 0 or not isValidHeaderName(token) or
+            not eqCaseInsensitive(token, "chunked"):
+          return HeaderParseResult(ok: false, statusCode: 400, errBody: "Bad Request")
+        inc transferTokenCount
+        tokenStart = tokenEnd + 1
     of h1hExpect:
-      if expectHeader.len > 0:
-        expectHeader.add(",")
-      expectHeader.add(val)
+      var tokenStart = 0
+      while tokenStart < val.len:
+        while tokenStart < val.len and val[tokenStart] in {' ', '\t'}: inc tokenStart
+        var tokenEnd = tokenStart
+        while tokenEnd < val.len and val[tokenEnd] != ',': inc tokenEnd
+        var trimmedEnd = tokenEnd
+        while trimmedEnd > tokenStart and val[trimmedEnd - 1] in {' ', '\t'}: dec trimmedEnd
+        let token = val[tokenStart .. trimmedEnd - 1]
+        if token.len == 0 or not eqCaseInsensitive(token, "100-continue"):
+          return HeaderParseResult(ok: false, statusCode: 417, errBody: "Expectation Failed")
+        inc expectTokenCount
+        tokenStart = tokenEnd + 1
     of h1hConnection:
       if headerHasToken(val, "close"):
         result.hasConnectionClose = true
@@ -331,152 +392,42 @@ proc parseHeaderBlock(headerBlock: string, config: HttpServerConfig): HeaderPars
         result.hasConnectionKeepAlive = true
     of h1hOther:
       discard
-    result.headers.add (rawKey, val)
-
     pos = hEnd + 2  # skip \r\n
 
-  if result.httpVersion == "HTTP/1.1" and hostHeaderCount != 1:
+  if httpVersion == "HTTP/1.1" and hostHeaderCount != 1:
     return HeaderParseResult(ok: false, statusCode: 400, errBody: "Bad Request")
-  if result.httpVersion == "HTTP/1.0" and hostHeaderCount > 1:
+  if httpVersion == "HTTP/1.0" and hostHeaderCount > 1:
     return HeaderParseResult(ok: false, statusCode: 400, errBody: "Bad Request")
 
   # Process expect header
-  if expectHeader.len > 0:
-    var expectTokens: seq[string]
-    if not parseCommaTokens(expectHeader, expectTokens):
-      return HeaderParseResult(ok: false, statusCode: 417, errBody: "Expectation Failed")
-    for token in expectTokens:
-      if token == "100-continue":
-        result.hasExpect100Continue = true
-      else:
-        return HeaderParseResult(ok: false, statusCode: 417, errBody: "Expectation Failed")
+  if expectTokenCount > 0:
+    result.hasExpect100Continue = true
     if result.hasExpect100Continue and
        result.sawContentLength and
        config.maxRequestBodySize > 0 and
        result.parsedContentLength > config.maxRequestBodySize:
       return HeaderParseResult(ok: false, statusCode: 413, errBody: "Payload Too Large")
 
+  if transferTokenCount > 1:
+    return HeaderParseResult(ok: false, statusCode: 400, errBody: "Bad Request")
+  result.hasChunkedTransfer = transferTokenCount == 1
+  result.headers = ByteRange(start: headersStart, len: headerBlock.len - headersStart)
+  result.headerCount = headerCount
+  result.requestBytes = headerBlock.len + 4
+
   result.ok = true
 
-proc parseRequestResultWithBody(stream: AsyncStream, reader: BufferedReader,
-                                config: HttpServerConfig,
-                                remoteAddr: string,
-                                hdr: HeaderParseResult): CpsFuture[ParseRequestResult] {.cps.} =
-  ## CPS proc for parsing requests WITH bodies (Content-Length or chunked).
-  ## Only called when the request has a body to read.
-  var body = ""
-  var headerCount = hdr.headers.len
-  var totalHeaderBytes = 0  # approximate
-
-  if hdr.transferEncoding.len > 0 and hdr.sawContentLength:
-    return ParseRequestResult(statusCode: 400, errBody: "Bad Request")
-
-  var hasChunkedTransfer = false
-  if hdr.transferEncoding.len > 0:
-    var teTokens: seq[string]
-    if not parseTransferEncodingTokens(hdr.transferEncoding, teTokens):
-      return ParseRequestResult(statusCode: 400, errBody: "Bad Request")
-    hasChunkedTransfer = true
-
-  if hdr.hasExpect100Continue and (hasChunkedTransfer or (hdr.sawContentLength and hdr.parsedContentLength > 0)):
-    try:
-      await stream.write("HTTP/1.1 100 Continue\r\n\r\n")
-    except CatchableError:
-      return ParseRequestResult(closeConn: true)
-
-  if hasChunkedTransfer:
-    var bodyParts: seq[string]
-    var totalBodyBytes = 0
-    while true:
-      var sizeLine = ""
-      try:
-        sizeLine = await applyReadTimeout(reader.readLine(), config.readTimeoutMs)
-      except TimeoutError:
-        return ParseRequestResult(statusCode: 408, errBody: "Request Timeout")
-      except CatchableError:
-        return ParseRequestResult(closeConn: true)
-      let semi = sizeLine.find(';')
-      var sizeStr = sizeLine
-      if semi >= 0:
-        sizeStr = sizeLine[0 ..< semi]
-      let sizeToken = sizeStr.strip()
-      if sizeToken.len == 0:
-        return ParseRequestResult(statusCode: 400, errBody: "Bad Request")
-      var chunkSize = 0
-      if not parseHexChunkSize(sizeToken, chunkSize):
-        return ParseRequestResult(statusCode: 400, errBody: "Bad Request")
-      if chunkSize == 0:
-        while true:
-          var trailerLine = ""
-          try:
-            trailerLine = await applyReadTimeout(reader.readLine(), config.readTimeoutMs)
-          except TimeoutError:
-            return ParseRequestResult(statusCode: 408, errBody: "Request Timeout")
-          except CatchableError:
-            return ParseRequestResult(closeConn: true)
-          if trailerLine.len == 0:
-            break
-          if trailerLine[0] == ' ' or trailerLine[0] == '\t':
-            return ParseRequestResult(statusCode: 400, errBody: "Bad Request")
-          let trailerColon = trailerLine.find(':')
-          if trailerColon <= 0:
-            return ParseRequestResult(statusCode: 400, errBody: "Bad Request")
-          let trailerKeyRaw = trailerLine.substr(0, trailerColon - 1)
-          if trailerKeyRaw != trailerKeyRaw.strip():
-            return ParseRequestResult(statusCode: 400, errBody: "Bad Request")
-          let trailerVal = trailerLine[trailerColon + 1 .. ^1].strip()
-          if not validateHeaderPair(trailerKeyRaw, trailerVal):
-            return ParseRequestResult(statusCode: 400, errBody: "Bad Request")
-          inc headerCount
-          totalHeaderBytes += trailerLine.len
-          if config.maxHeaderCount > 0 and headerCount > config.maxHeaderCount:
-            return ParseRequestResult(statusCode: 431, errBody: "Request Header Fields Too Large")
-          if config.maxHeaderLineSize > 0 and trailerLine.len > config.maxHeaderLineSize:
-            return ParseRequestResult(statusCode: 431, errBody: "Request Header Fields Too Large")
-          if config.maxHeaderBytes > 0 and totalHeaderBytes > config.maxHeaderBytes:
-            return ParseRequestResult(statusCode: 431, errBody: "Request Header Fields Too Large")
-        break
-      totalBodyBytes += chunkSize
-      if config.maxRequestBodySize > 0 and totalBodyBytes > config.maxRequestBodySize:
-        return ParseRequestResult(statusCode: 413, errBody: "Payload Too Large")
-      var data = ""
-      try:
-        data = await applyReadTimeout(reader.readExact(chunkSize), config.readTimeoutMs)
-      except TimeoutError:
-        return ParseRequestResult(statusCode: 408, errBody: "Request Timeout")
-      except CatchableError:
-        return ParseRequestResult(closeConn: true)
-      bodyParts.add data
-      var chunkTrailing = ""
-      try:
-        chunkTrailing = await applyReadTimeout(reader.readExact(2), config.readTimeoutMs)
-      except TimeoutError:
-        return ParseRequestResult(statusCode: 408, errBody: "Request Timeout")
-      except CatchableError:
-        return ParseRequestResult(closeConn: true)
-      if chunkTrailing != "\r\n":
-        return ParseRequestResult(statusCode: 400, errBody: "Bad Request")
-    body = bodyParts.join("")
-  elif hdr.sawContentLength:
-    let cl = hdr.parsedContentLength
-    if config.maxRequestBodySize > 0 and cl > config.maxRequestBodySize:
-      return ParseRequestResult(statusCode: 413, errBody: "Payload Too Large")
-    if cl > 0:
-      var bodyData = ""
-      try:
-        bodyData = await applyReadTimeout(reader.readExact(cl), config.readTimeoutMs)
-      except TimeoutError:
-        return ParseRequestResult(statusCode: 408, errBody: "Request Timeout")
-      except CatchableError:
-        return ParseRequestResult(closeConn: true)
-      body = bodyData
-
-  var req = HttpRequest(
-    meth: hdr.meth,
-    path: hdr.path,
-    httpVersion: hdr.httpVersion,
-    headers: hdr.headers,
-    body: body,
+proc makeBorrowedRequest(stream: AsyncStream, reader: BufferedReader,
+                         config: HttpServerConfig, remoteAddr: string,
+                         hdr: HeaderParseResult, bodyStart, bodyLen: int): HttpRequest {.inline.} =
+  let base = reader.bufferData()
+  HttpRequest(
+    meth: view(base, hdr.meth.start, hdr.meth.len),
+    path: view(base, hdr.path.start, hdr.path.len),
+    httpVersion: view(base, hdr.httpVersion.start, hdr.httpVersion.len),
+    headers: rawHttp1Headers(
+      view(base, hdr.headers.start, hdr.headers.len), hdr.headerCount),
+    body: view(base, bodyStart, bodyLen),
     remoteAddr: remoteAddr,
     stream: stream,
     reader: reader,
@@ -484,11 +435,171 @@ proc parseRequestResultWithBody(stream: AsyncStream, reader: BufferedReader,
     maxWsFrameBytes: config.maxWsFrameBytes,
     maxWsMessageBytes: config.maxWsMessageBytes
   )
-  return ParseRequestResult(ok: true, req: req,
-    hasConnectionClose: hdr.hasConnectionClose,
-    hasConnectionKeepAlive: hdr.hasConnectionKeepAlive)
 
-proc processHeaderBlockPoll(headerBlock: string, config: HttpServerConfig,
+proc fillTo(reader: BufferedReader, needed, timeoutMs: int): CpsFuture[bool] {.cps.} =
+  while reader.available < needed:
+    try:
+      let filled = await applyReadTimeout(reader.fillBuffer(), timeoutMs)
+      if not filled:
+        return false
+    except CatchableError:
+      raise
+  return true
+
+proc findBufferedCrlf(reader: BufferedReader, start: int): int {.inline.} =
+  var i = start
+  while i + 1 < reader.available:
+    if reader.bufferedChar(i) == '\r' and reader.bufferedChar(i + 1) == '\n':
+      return i
+    inc i
+  -1
+
+proc parseHexChunkSize(value: ByteView, parsed: var int): bool =
+  var first = 0
+  var last = value.len
+  while first < last and value[first] in {' ', '\t'}: inc first
+  while last > first and value[last - 1] in {' ', '\t'}: dec last
+  let semi = value.find(';', first)
+  if semi >= 0 and semi < last: last = semi
+  if first >= last: return false
+  var n: uint64 = 0
+  for i in first ..< last:
+    let ch = value[i]
+    var digit: uint64
+    if ch in {'0' .. '9'}: digit = uint64(ord(ch) - ord('0'))
+    elif ch in {'a' .. 'f'}: digit = uint64(ord(ch) - ord('a') + 10)
+    elif ch in {'A' .. 'F'}: digit = uint64(ord(ch) - ord('A') + 10)
+    else: return false
+    if n > (uint64(high(int)) shr 4): return false
+    n = (n shl 4) or digit
+  parsed = int(n)
+  true
+
+proc parseRequestResultWithBody(stream: AsyncStream, reader: BufferedReader,
+                                config: HttpServerConfig,
+                                remoteAddr: string,
+                                hdr: HeaderParseResult): CpsFuture[ParseRequestResult] {.cps.} =
+  ## Buffer the complete message once, then expose fields and body as views.
+  ## Chunk framing is removed in place; no body strings or part sequences exist.
+  if hdr.hasChunkedTransfer and hdr.sawContentLength:
+    return ParseRequestResult(statusCode: 400, errBody: "Bad Request")
+
+  if hdr.hasExpect100Continue:
+    try:
+      await stream.write("HTTP/1.1 100 Continue\r\n\r\n")
+    except CatchableError:
+      return ParseRequestResult(closeConn: true)
+
+  var requestBytes = hdr.requestBytes
+  var bodyLen = 0
+  let bodyStart = hdr.requestBytes
+
+  if hdr.hasChunkedTransfer:
+    var source = bodyStart
+    var destination = bodyStart
+    var headerCount = hdr.headerCount
+    var trailerBytes = 0
+    while true:
+      var lineEnd = reader.findBufferedCrlf(source)
+      while lineEnd < 0:
+        try:
+          let filled = await reader.fillTo(reader.available + 1, config.readTimeoutMs)
+          if not filled:
+            return ParseRequestResult(closeConn: true)
+        except TimeoutError:
+          return ParseRequestResult(statusCode: 408, errBody: "Request Timeout")
+        except CatchableError:
+          return ParseRequestResult(closeConn: true)
+        lineEnd = reader.findBufferedCrlf(source)
+
+      var chunkSize = 0
+      let base = reader.bufferData()
+      if not parseHexChunkSize(view(base, source, lineEnd - source), chunkSize):
+        return ParseRequestResult(statusCode: 400, errBody: "Bad Request")
+      source = lineEnd + 2
+
+      if chunkSize == 0:
+        while true:
+          lineEnd = reader.findBufferedCrlf(source)
+          while lineEnd < 0:
+            try:
+              let filled = await reader.fillTo(reader.available + 1, config.readTimeoutMs)
+              if not filled:
+                return ParseRequestResult(closeConn: true)
+            except TimeoutError:
+              return ParseRequestResult(statusCode: 408, errBody: "Request Timeout")
+            except CatchableError:
+              return ParseRequestResult(closeConn: true)
+            lineEnd = reader.findBufferedCrlf(source)
+          if lineEnd == source:
+            source += 2
+            break
+          let lineLen = lineEnd - source
+          let current = reader.bufferData()
+          if current[source] in {' ', '\t'}:
+            return ParseRequestResult(statusCode: 400, errBody: "Bad Request")
+          var colon = source
+          while colon < lineEnd and current[colon] != ':': inc colon
+          if colon == source or colon == lineEnd or current[colon - 1] in {' ', '\t'}:
+            return ParseRequestResult(statusCode: 400, errBody: "Bad Request")
+          var valueStart = colon + 1
+          while valueStart < lineEnd and current[valueStart] in {' ', '\t'}: inc valueStart
+          var valueEnd = lineEnd
+          while valueEnd > valueStart and current[valueEnd - 1] in {' ', '\t'}: dec valueEnd
+          if not validateHeaderPair(
+              view(current, source, colon - source),
+              view(current, valueStart, valueEnd - valueStart)):
+            return ParseRequestResult(statusCode: 400, errBody: "Bad Request")
+          inc headerCount
+          trailerBytes += lineLen
+          if (config.maxHeaderCount > 0 and headerCount > config.maxHeaderCount) or
+              (config.maxHeaderLineSize > 0 and lineLen > config.maxHeaderLineSize) or
+              (config.maxHeaderBytes > 0 and trailerBytes > config.maxHeaderBytes):
+            return ParseRequestResult(statusCode: 431, errBody: "Request Header Fields Too Large")
+          source = lineEnd + 2
+        requestBytes = source
+        break
+
+      if config.maxRequestBodySize > 0 and bodyLen + chunkSize > config.maxRequestBodySize:
+        return ParseRequestResult(statusCode: 413, errBody: "Payload Too Large")
+      try:
+        let filled = await reader.fillTo(source + chunkSize + 2, config.readTimeoutMs)
+        if not filled:
+          return ParseRequestResult(closeConn: true)
+      except TimeoutError:
+        return ParseRequestResult(statusCode: 408, errBody: "Request Timeout")
+      except CatchableError:
+        return ParseRequestResult(closeConn: true)
+      let current = reader.bufferData()
+      if current[source + chunkSize] != '\r' or current[source + chunkSize + 1] != '\n':
+        return ParseRequestResult(statusCode: 400, errBody: "Bad Request")
+      if chunkSize > 0:
+        moveMem(addr current[destination], addr current[source], chunkSize)
+      destination += chunkSize
+      bodyLen += chunkSize
+      source += chunkSize + 2
+  else:
+    bodyLen = hdr.parsedContentLength
+    if config.maxRequestBodySize > 0 and bodyLen > config.maxRequestBodySize:
+      return ParseRequestResult(statusCode: 413, errBody: "Payload Too Large")
+    requestBytes += bodyLen
+    try:
+      let filled = await reader.fillTo(requestBytes, config.readTimeoutMs)
+      if not filled:
+        return ParseRequestResult(closeConn: true)
+    except TimeoutError:
+      return ParseRequestResult(statusCode: 408, errBody: "Request Timeout")
+    except CatchableError:
+      return ParseRequestResult(closeConn: true)
+
+  let req = makeBorrowedRequest(
+    stream, reader, config, remoteAddr, hdr, bodyStart, bodyLen)
+  return ParseRequestResult(
+    ok: true, req: req, hasConnectionClose: hdr.hasConnectionClose,
+    hasConnectionKeepAlive: hdr.hasConnectionKeepAlive,
+    requestBytes: requestBytes)
+
+proc processHeaderBlockPoll(headerBlock: ByteView, config: HttpServerConfig,
                             stream: AsyncStream, reader: BufferedReader,
                             remoteAddr: string,
                             parsed: ptr ParseRequestResult): CpsFuture[ParseRequestResult] =
@@ -508,32 +619,21 @@ proc processHeaderBlockPoll(headerBlock: string, config: HttpServerConfig,
     return nil
 
   # Check if body reading is needed
-  let needsBody = hdr.transferEncoding.len > 0 or
+  let needsBody = hdr.hasChunkedTransfer or
                   (hdr.sawContentLength and hdr.parsedContentLength > 0) or
                   hdr.hasExpect100Continue
   if needsBody:
     return parseRequestResultWithBody(stream, reader, config, remoteAddr, hdr)
 
   # No body — fast path: return pre-completed future
-  let req = HttpRequest(
-    meth: hdr.meth,
-    path: hdr.path,
-    httpVersion: hdr.httpVersion,
-    headers: hdr.headers,
-    body: "",
-    remoteAddr: remoteAddr,
-    stream: stream,
-    reader: reader,
-    context: nil,
-    maxWsFrameBytes: config.maxWsFrameBytes,
-    maxWsMessageBytes: config.maxWsMessageBytes
-  )
+  let req = makeBorrowedRequest(stream, reader, config, remoteAddr, hdr, 0, 0)
   parsed[] = ParseRequestResult(ok: true, req: req,
     hasConnectionClose: hdr.hasConnectionClose,
-    hasConnectionKeepAlive: hdr.hasConnectionKeepAlive)
+    hasConnectionKeepAlive: hdr.hasConnectionKeepAlive,
+    requestBytes: hdr.requestBytes)
   return nil
 
-proc processHeaderBlock(headerBlock: string, config: HttpServerConfig,
+proc processHeaderBlock(headerBlock: ByteView, config: HttpServerConfig,
                         stream: AsyncStream, reader: BufferedReader,
                         remoteAddr: string): CpsFuture[ParseRequestResult] =
   ## Compatibility wrapper for callers that always consume a Future.
@@ -543,28 +643,56 @@ proc processHeaderBlock(headerBlock: string, config: HttpServerConfig,
   if result.isNil:
     result = completedFuture(parsed)
 
+proc parseRequestPending(stream: AsyncStream, reader: BufferedReader,
+                         config: HttpServerConfig,
+                         remoteAddr: string): CpsFuture[ParseRequestResult] {.cps.} =
+  let maxHeaderSize =
+    if config.maxHeaderBytes > 0: config.maxHeaderBytes
+    else: 65536
+  while true:
+    let headerEnd = reader.searchHeaderEndOffset()
+    if headerEnd >= 0:
+      var parsed: ParseRequestResult
+      let headerBlock = view(reader.bufferData(), headerEnd)
+      let bodyFut = processHeaderBlockPoll(
+        headerBlock, config, stream, reader, remoteAddr, addr parsed)
+      if bodyFut.isNil: return parsed
+      return await bodyFut
+    if reader.available > maxHeaderSize:
+      return ParseRequestResult(
+        statusCode: 431, errBody: "Request Header Fields Too Large")
+    if reader.atEof():
+      return ParseRequestResult(closeConn: true)
+    try:
+      let filled = await applyReadTimeout(reader.fillBuffer(), config.readTimeoutMs)
+      if not filled:
+        return ParseRequestResult(closeConn: true)
+    except TimeoutError:
+      return ParseRequestResult(statusCode: 408, errBody: "Request Timeout")
+    except CatchableError:
+      return ParseRequestResult(closeConn: true)
+
 proc parseRequestResultPoll(stream: AsyncStream, reader: BufferedReader,
                             config: HttpServerConfig, remoteAddr: string,
                             parsed: ptr ParseRequestResult): CpsFuture[ParseRequestResult] =
   ## Parse an HTTP/1.1 request. Avoids CPS env allocation for the common case
   ## and returns nil with `parsed` populated when it finishes synchronously.
-  let maxHeaderSize = if config.maxHeaderBytes > 0: config.maxHeaderBytes else: 65536
-
-  # Ultra-fast path: search buffer directly, bypass readUntilHeaderEnd's CpsFuture
-  var idx = reader.searchHeaderEnd()
+  # Ultra-fast path: parse directly from the connection buffer. Consumption is
+  # deferred until the response has completed, which leases all request views.
+  var idx = reader.searchHeaderEndOffset()
   if idx >= 0:
     return processHeaderBlockPoll(
-      reader.extractHeaderBlock(idx), config, stream, reader, remoteAddr, parsed)
+      view(reader.bufferData(), idx), config, stream, reader, remoteAddr, parsed)
 
   # Try one sync fill, then check again (common for keep-alive)
   if not reader.atEof():
     let fillFut = reader.fillBuffer()
     if fillFut.finished():
       if not fillFut.hasError():
-        idx = reader.searchHeaderEnd()
+        idx = reader.searchHeaderEndOffset()
         if idx >= 0:
           return processHeaderBlockPoll(
-            reader.extractHeaderBlock(idx), config, stream, reader, remoteAddr, parsed)
+            view(reader.bufferData(), idx), config, stream, reader, remoteAddr, parsed)
         if reader.atEof():
           parsed[] = ParseRequestResult(closeConn: true)
           return nil
@@ -572,128 +700,14 @@ proc parseRequestResultPoll(stream: AsyncStream, reader: BufferedReader,
         parsed[] = ParseRequestResult(closeConn: true)
         return nil
     else:
-      # fillBuffer is pending (EAGAIN) — wait for data, then use readUntilHeaderEnd
-      let resultFut = newCpsFuture[ParseRequestResult]()
-      fillFut.addCallback(proc() =
-        if fillFut.hasError():
-          resultFut.complete(ParseRequestResult(closeConn: true))
-          return
-        # The normal readiness path has a complete request after one fill.
-        # Parse it directly instead of constructing completed header/body
-        # futures and another callback layer.
-        let filledEnd = reader.searchHeaderEnd()
-        if filledEnd >= 0:
-          var filledParsed: ParseRequestResult
-          let filledFut = processHeaderBlockPoll(
-            reader.extractHeaderBlock(filledEnd), config, stream, reader,
-            remoteAddr, addr filledParsed)
-          if filledFut.isNil:
-            resultFut.complete(filledParsed)
-          elif filledFut.finished():
-            if filledFut.hasError():
-              resultFut.fail(filledFut.getError())
-            else:
-              resultFut.complete(filledFut.read())
-          else:
-            filledFut.addCallback(proc() =
-              if filledFut.hasError():
-                resultFut.fail(filledFut.getError())
-              else:
-                resultFut.complete(filledFut.read())
-            )
-          return
-
-        # Split headers or unusually large headers retain the general reader.
-        let headerFut = applyReadTimeout(reader.readUntilHeaderEnd(maxHeaderSize), config.readTimeoutMs)
-        if headerFut.finished():
-          if headerFut.hasError():
-            let err = headerFut.getError()
-            if err of TimeoutError:
-              resultFut.complete(ParseRequestResult(statusCode: 408, errBody: "Request Timeout"))
-            else:
-              resultFut.complete(ParseRequestResult(closeConn: true))
-          else:
-            let innerFut = processHeaderBlock(headerFut.read(), config, stream, reader, remoteAddr)
-            if innerFut.finished():
-              if innerFut.hasError():
-                resultFut.fail(innerFut.getError())
-              else:
-                resultFut.complete(innerFut.read())
-            else:
-              innerFut.addCallback(proc() =
-                if innerFut.hasError():
-                  resultFut.fail(innerFut.getError())
-                else:
-                  resultFut.complete(innerFut.read())
-              )
-        else:
-          headerFut.addCallback(proc() =
-            if headerFut.hasError():
-              let err = headerFut.getError()
-              if err of TimeoutError:
-                resultFut.complete(ParseRequestResult(statusCode: 408, errBody: "Request Timeout"))
-              else:
-                resultFut.complete(ParseRequestResult(closeConn: true))
-            else:
-              let innerFut = processHeaderBlock(headerFut.read(), config, stream, reader, remoteAddr)
-              if innerFut.finished():
-                if innerFut.hasError():
-                  resultFut.fail(innerFut.getError())
-                else:
-                  resultFut.complete(innerFut.read())
-              else:
-                innerFut.addCallback(proc() =
-                  if innerFut.hasError():
-                    resultFut.fail(innerFut.getError())
-                  else:
-                    resultFut.complete(innerFut.read())
-                )
-          )
-      )
-      return resultFut
+      return parseRequestPending(stream, reader, config, remoteAddr)
 
   # EOF with no data
   if reader.atEof():
     parsed[] = ParseRequestResult(closeConn: true)
     return nil
 
-  # Fall back to full readUntilHeaderEnd (for edge cases)
-  let headerFut = applyReadTimeout(reader.readUntilHeaderEnd(maxHeaderSize), config.readTimeoutMs)
-  if headerFut.finished():
-    if headerFut.hasError():
-      let err = headerFut.getError()
-      if err of TimeoutError:
-        parsed[] = ParseRequestResult(statusCode: 408, errBody: "Request Timeout")
-      else:
-        parsed[] = ParseRequestResult(closeConn: true)
-      return nil
-    return processHeaderBlockPoll(
-      headerFut.read(), config, stream, reader, remoteAddr, parsed)
-
-  let resultFut = newCpsFuture[ParseRequestResult]()
-  headerFut.addCallback(proc() =
-    if headerFut.hasError():
-      let err = headerFut.getError()
-      if err of TimeoutError:
-        resultFut.complete(ParseRequestResult(statusCode: 408, errBody: "Request Timeout"))
-      else:
-        resultFut.complete(ParseRequestResult(closeConn: true))
-    else:
-      let innerFut = processHeaderBlock(headerFut.read(), config, stream, reader, remoteAddr)
-      if innerFut.finished():
-        if innerFut.hasError():
-          resultFut.fail(innerFut.getError())
-        else:
-          resultFut.complete(innerFut.read())
-      else:
-        innerFut.addCallback(proc() =
-          if innerFut.hasError():
-            resultFut.fail(innerFut.getError())
-          else:
-            resultFut.complete(innerFut.read())
-        )
-  )
-  return resultFut
+  return parseRequestPending(stream, reader, config, remoteAddr)
 
 proc parseRequestResult(stream: AsyncStream, reader: BufferedReader,
                         config: HttpServerConfig,
@@ -736,6 +750,12 @@ proc addInt(s: var string, n: int) {.inline.} =
     inc lo
     dec hi
 
+proc addView(s: var string, value: ByteView) {.inline.} =
+  let oldLen = s.len
+  s.setLen(oldLen + value.len)
+  if value.len > 0:
+    copyMem(addr s[oldLen], value.data, value.len)
+
 proc statusLine(code: int): string {.inline.} =
   ## Return pre-computed status line prefix for common codes.
   case code
@@ -757,17 +777,16 @@ proc statusLine(code: int): string {.inline.} =
     s.add "\r\n"
     s
 
-proc buildResponseStringImpl(resp: HttpResponseBuilder,
-                             sendBody: bool,
-                             bodyLengthHint: int): string =
+proc buildResponseInto(resp: HttpResponseBuilder, sendBody: bool,
+                       bodyLengthHint: int, output: var string) =
+  output.setLen(0)
   if not validateResponseHeaders(resp.headers):
     let body = "Internal Server Error"
-    result = newStringOfCap(128)
-    result.add "HTTP/1.1 500 Internal Server Error\r\nContent-Length: "
-    result.addInt(body.len)
-    result.add "\r\nConnection: close\r\n\r\n"
+    output.add "HTTP/1.1 500 Internal Server Error\r\nContent-Length: "
+    output.addInt(body.len)
+    output.add "\r\nConnection: close\r\n\r\n"
     if sendBody:
-      result.add body
+      output.add body
     return
 
   let noBody = statusProhibitsBody(resp.statusCode)
@@ -775,30 +794,35 @@ proc buildResponseStringImpl(resp: HttpResponseBuilder,
   let representationLen =
     if bodyLengthHint >= 0: bodyLengthHint
     else: resp.body.len
-  let bodyStr =
-    if noBody or resetContentNoPayload or not sendBody: ""
+  let bodyStr: ByteView =
+    if noBody or resetContentNoPayload or not sendBody: ByteView()
     else: resp.body
 
   # Pre-allocate: status line + headers + body
-  result = newStringOfCap(256 + bodyStr.len)
-  result.add statusLine(resp.statusCode)
+  output.add statusLine(resp.statusCode)
 
   for (k, v) in resp.headers:
     if eqCaseInsensitive(k, "content-length") or eqCaseInsensitive(k, "transfer-encoding"):
       continue
-    result.add k
-    result.add ": "
-    result.add v
-    result.add "\r\n"
+    output.add k
+    output.add ": "
+    output.add v
+    output.add "\r\n"
   if resetContentNoPayload:
-    result.add "Content-Length: 0\r\n"
+    output.add "Content-Length: 0\r\n"
   elif not noBody:
-    result.add "Content-Length: "
-    result.addInt(representationLen)
-    result.add "\r\n"
+    output.add "Content-Length: "
+    output.addInt(representationLen)
+    output.add "\r\n"
 
-  result.add "\r\n"
-  result.add bodyStr
+  output.add "\r\n"
+  output.addView(bodyStr)
+
+proc buildResponseStringImpl(resp: HttpResponseBuilder,
+                             sendBody: bool,
+                             bodyLengthHint: int): string =
+  result = newStringOfCap(256 + resp.body.len)
+  buildResponseInto(resp, sendBody, bodyLengthHint, result)
 
 proc buildResponseString*(resp: HttpResponseBuilder): string =
   ## Build the HTTP/1.1 response string from a response builder.
@@ -810,6 +834,19 @@ proc writeResponse*(stream: AsyncStream, resp: HttpResponseBuilder,
   ## Write an HTTP/1.1 response to the stream.
   let respStr = buildResponseStringImpl(resp, sendBody, bodyLengthHint)
   stream.write(respStr)
+
+proc writeResponseBuffered(stream: AsyncStream, resp: HttpResponseBuilder,
+                           output: var string, sendBody: bool = true,
+                           bodyLengthHint: int = -1): CpsVoidFuture =
+  let borrowBody = sendBody and resp.body.len > 0 and
+    not statusProhibitsBody(resp.statusCode) and
+    validateResponseHeaders(resp.headers)
+  if borrowBody:
+    buildResponseInto(resp, false, resp.body.len, output)
+    return stream.writevBorrowed(
+      addr output[0], output.len, resp.body.data, resp.body.len)
+  buildResponseInto(resp, sendBody, bodyLengthHint, output)
+  stream.writeBorrowed(addr output[0], output.len)
 
 proc headBodyLengthHint(resp: HttpResponseBuilder): int =
   ## For HEAD requests, extract Content-Length from headers if present
@@ -830,6 +867,7 @@ proc handleHttp1Connection*(stream: AsyncStream, config: HttpServerConfig,
     if config.initialReadBufferBytes > 0: config.initialReadBufferBytes
     else: 2048
   let reader = newBufferedReader(stream, initialBufferBytes)
+  var responseBuffer = newStringOfCap(256)
   var canCloseImmediately = false
   while true:
     var req: HttpRequest
@@ -844,6 +882,9 @@ proc handleHttp1Connection*(stream: AsyncStream, config: HttpServerConfig,
     if parsed.ok:
       req = parsed.req
       hasRequest = true
+      # Advance logical input now while retaining the leased bytes in-place.
+      # The next fill/compaction cannot happen until this handler completes.
+      reader.consumeBuffered(parsed.requestBytes)
     elif parsed.statusCode != 0:
       parseErrStatus = parsed.statusCode
       parseErrBody = parsed.errBody
@@ -852,7 +893,9 @@ proc handleHttp1Connection*(stream: AsyncStream, config: HttpServerConfig,
 
     if parseErrStatus != 0:
       try:
-        await writeResponse(stream, newResponse(parseErrStatus, parseErrBody, @[("Connection", "close")]))
+        await writeResponseBuffered(stream,
+          newResponse(parseErrStatus, parseErrBody, @[("Connection", "close")]),
+          responseBuffer)
       except CatchableError:
         discard
       break
@@ -906,21 +949,23 @@ proc handleHttp1Connection*(stream: AsyncStream, config: HttpServerConfig,
           else:
             await stream.write(H1Empty200KeepAliveResponse)
         else:
-          var s = newStringOfCap(64 + resp.body.len)
-          s.add "HTTP/1.1 200 OK\r\nContent-Length: "
-          s.addInt(resp.body.len)
+          responseBuffer.setLen(0)
+          responseBuffer.add "HTTP/1.1 200 OK\r\nContent-Length: "
+          responseBuffer.addInt(resp.body.len)
           if shouldCloseAfterResponse:
-            s.add "\r\nConnection: close\r\n\r\n"
+            responseBuffer.add "\r\nConnection: close\r\n\r\n"
           else:
-            s.add "\r\n\r\n"
-          s.add resp.body
-          await stream.write(s)
+            responseBuffer.add "\r\n\r\n"
+          await stream.writevBorrowed(
+            addr responseBuffer[0], responseBuffer.len,
+            resp.body.data, resp.body.len)
       else:
         if isHeadRequest:
           let hint = headBodyLengthHint(resp)
-          await writeResponse(stream, resp, sendBody = false, bodyLengthHint = hint)
+          await writeResponseBuffered(stream, resp, responseBuffer,
+            sendBody = false, bodyLengthHint = hint)
         else:
-          await writeResponse(stream, resp)
+          await writeResponseBuffered(stream, resp, responseBuffer)
     except CatchableError:
       writeFailed = true
     if writeFailed:

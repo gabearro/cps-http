@@ -1,5 +1,5 @@
 nimTitle	sse	cps/http/client/sse.html	module cps/http/client/sse		0
 nim	SseEvent	cps/http/client/sse.html#SseEvent	object SseEvent		25
 nim	SseClient	cps/http/client/sse.html#SseClient	type SseClient		31
-nim	connectSse	cps/http/client/sse.html#connectSse,string,int,string,bool,seq[],bool,TlsFingerprint,seq[ProxyConfig]	proc connectSse(host: string; port: int; path: string = "/events";\n           useTls: bool = false; extraHeaders: seq[(string, string)] = @[];\n           enableCompression: bool = true; tlsFingerprint: TlsFingerprint = nil;\n           proxy: seq[ProxyConfig] = @[]): CpsFuture[SseClient]		2410
-nim	readEvent	cps/http/client/sse.html#readEvent,SseClient	proc readEvent(client: SseClient): CpsFuture[SseEvent]		2410
+nim	connectSse	cps/http/client/sse.html#connectSse,string,int,string,bool,seq[],bool,TlsFingerprint,seq[ProxyConfig]	proc connectSse(host: string; port: int; path: string = "/events";\n           useTls: bool = false; extraHeaders: seq[(string, string)] = @[];\n           enableCompression: bool = true; tlsFingerprint: TlsFingerprint = nil;\n           proxy: seq[ProxyConfig] = @[]): CpsFuture[SseClient]		2425
+nim	readEvent	cps/http/client/sse.html#readEvent,SseClient	proc readEvent(client: SseClient): CpsFuture[SseEvent]		2425

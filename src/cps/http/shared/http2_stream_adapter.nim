@@ -15,7 +15,8 @@ import cps/io/streams
 type
   AdapterSendHeadersProc* = proc(streamId: uint32, statusCode: int,
                                  headers: seq[(string, string)]): CpsVoidFuture {.closure.}
-  AdapterSendDataProc* = proc(streamId: uint32, data: string): CpsVoidFuture {.closure.}
+  AdapterSendDataProc* = proc(streamId: uint32, data: pointer,
+                              len: int): CpsVoidFuture {.closure.}
   AdapterCloseWriteProc* = proc(streamId: uint32): CpsVoidFuture {.closure.}
 
 type
@@ -52,10 +53,18 @@ proc tryWakeWaiters(a: Http2StreamAdapter) =
     else:
       inc i
 
-proc feedData*(a: Http2StreamAdapter, data: string) =
-  ## Called by processServerFrame when a DATA frame arrives for this stream.
-  a.readBuffer.add(data)
+proc feedData*(a: Http2StreamAdapter, data: pointer, len: int) =
+  ## Retain borrowed DATA bytes once in the adapter's owning read buffer.
+  if len > 0:
+    let oldLen = a.readBuffer.len
+    a.readBuffer.setLen(oldLen + len)
+    copyMem(addr a.readBuffer[oldLen], data, len)
   a.tryWakeWaiters()
+
+proc feedData*(a: Http2StreamAdapter, data: string) {.inline.} =
+  ## Feed owned string data without constructing an intermediate frame value.
+  a.feedData(
+    (if data.len > 0: cast[pointer](unsafeAddr data[0]) else: nil), data.len)
 
 proc feedEof*(a: Http2StreamAdapter) =
   ## Called when END_STREAM or RST_STREAM is received.
@@ -103,7 +112,8 @@ proc adapterWrite(s: AsyncStream, data: string): CpsVoidFuture {.cps.} =
       await predecessor
     if not a.responseHeadersSent:
       await a.ensureAutoResponseHeaders()
-    await a.sendDataProc(a.streamId, data)
+    await a.sendDataProc(a.streamId,
+      (if data.len > 0: cast[pointer](unsafeAddr data[0]) else: nil), data.len)
     turn.complete()
   except CatchableError as err:
     if not turn.finished:

@@ -1,32 +1,90 @@
 nimTitle	types	cps/http/server/types.html	module cps/http/server/types		0
-nim	rcNone	cps/http/server/types.html#rcNone	ResponseControl.rcNone		16
-nim	rcPassRoute	cps/http/server/types.html#rcPassRoute	ResponseControl.rcPassRoute		16
-nim	rcContinue	cps/http/server/types.html#rcContinue	ResponseControl.rcContinue		16
-nim	rcHandled	cps/http/server/types.html#rcHandled	ResponseControl.rcHandled		16
-nim	ResponseControl	cps/http/server/types.html#ResponseControl	enum ResponseControl		16
-nim	TemplateRenderer	cps/http/server/types.html#TemplateRenderer	type TemplateRenderer		22
-nim	HttpRequest	cps/http/server/types.html#HttpRequest	object HttpRequest		24
-nim	HttpResponseBuilder	cps/http/server/types.html#HttpResponseBuilder	object HttpResponseBuilder		40
-nim	HttpHandler	cps/http/server/types.html#HttpHandler	type HttpHandler		46
-nim	HttpServerConfig	cps/http/server/types.html#HttpServerConfig	object HttpServerConfig		48
-nim	HttpServer	cps/http/server/types.html#HttpServer	type HttpServer		83
-nim	newResponse	cps/http/server/types.html#newResponse,int,string,seq[]	proc newResponse(statusCode: int; body: string = "";\n            headers: seq[(string, string)] = @[]): HttpResponseBuilder		94
-nim	passRouteResponse	cps/http/server/types.html#passRouteResponse,seq[]	proc passRouteResponse(headers: seq[(string, string)] = @[]): HttpResponseBuilder		104
-nim	continueResponse	cps/http/server/types.html#continueResponse	proc continueResponse(): HttpResponseBuilder		113
-nim	handledResponse	cps/http/server/types.html#handledResponse	proc handledResponse(): HttpResponseBuilder		122
-nim	eqCaseInsensitive	cps/http/server/types.html#eqCaseInsensitive,string,string	proc eqCaseInsensitive(a, b: string): bool		131
-nim	ensureContext	cps/http/server/types.html#ensureContext,HttpRequest	proc ensureContext(req: var HttpRequest)		138
-nim	getHeader	cps/http/server/types.html#getHeader,HttpRequest,string	proc getHeader(req: HttpRequest; name: string): string		143
-nim	getResponseHeader	cps/http/server/types.html#getResponseHeader,HttpResponseBuilder,string	proc getResponseHeader(resp: HttpResponseBuilder; name: string): string		150
-nim	isValidHeaderName	cps/http/server/types.html#isValidHeaderName,string	proc isValidHeaderName(name: string): bool		160
-nim	isValidHeaderValue	cps/http/server/types.html#isValidHeaderValue,string	proc isValidHeaderValue(value: string): bool		169
-nim	validateHeaderPair	cps/http/server/types.html#validateHeaderPair,string,string	proc validateHeaderPair(name, value: string): bool		182
-nim	validateResponseHeaders	cps/http/server/types.html#validateResponseHeaders,seq[]	proc validateResponseHeaders(headers: seq[(string, string)]): bool		186
-nim	isTrustedProxyAddress	cps/http/server/types.html#isTrustedProxyAddress,string,seq[string]	proc isTrustedProxyAddress(ip: string; cidrs: seq[string]): bool		240
-nim	statusMessage	cps/http/server/types.html#statusMessage,int	proc statusMessage(code: int): string		251
-nim	newHttpServer	cps/http/server/types.html#newHttpServer,HttpHandler,string,int,bool,string,string,bool,bool,int,bool,bool,bool,int,uint64,uint64,uint64,uint64,uint64,uint64,int,bool,int,bool,int,int,int,int,int,int,int,int,int,seq[string],bool	proc newHttpServer(handler: HttpHandler; host: string = "127.0.0.1"; port: int = 0;\n              useTls: bool = false; certFile: string = ""; keyFile: string = "";\n              enableHttp2: bool = true; enableHttp3: bool = false;\n              quicIdleTimeoutMs: int = 30000; quicUseRetry: bool = true;\n              quicEnableMigration: bool = true; quicEnableDatagram: bool = true;\n              quicMaxDatagramFrameSize: int = 1200;\n              quicInitialMaxData: uint64 = 1048576'u64;\n              quicInitialMaxStreamDataBidiLocal: uint64 = 262144'u64;\n              quicInitialMaxStreamDataBidiRemote: uint64 = 262144'u64;\n              quicInitialMaxStreamDataUni: uint64 = 262144'u64;\n              quicInitialMaxStreamsBidi: uint64 = 100'u64;\n              quicInitialMaxStreamsUni: uint64 = 100'u64;\n              maxConnections: int = 1000; reusePort: bool = false;\n              deferAcceptSeconds: int = 1; tcpNoDelay: bool = true;\n              initialReadBufferBytes: int = 2048;\n              maxRequestBodySize: int = 10240 * 1024;\n              readTimeoutMs: int = 30000; maxRequestLineSize: int = 8 * 1024;\n              maxHeaderLineSize: int = 8 * 1024;\n              maxHeaderBytes: int = 64 * 1024; maxHeaderCount: int = 100;\n              maxWsFrameBytes: int = 1024 * 1024;\n              maxWsMessageBytes: int = 16384 * 1024;\n              trustedProxyCidrs: seq[string] = @[];\n              trustedForwardedHeaders: bool = false): HttpServer		281
-nim	getPort	cps/http/server/types.html#getPort,HttpServer	proc getPort(server: HttpServer): int		360
-nim	bindAndListen	cps/http/server/types.html#bindAndListen,HttpServer	proc bindAndListen(server: HttpServer)		364
-nim	stop	cps/http/server/types.html#stop,HttpServer	proc stop(server: HttpServer)		382
-nim	onStart	cps/http/server/types.html#onStart,HttpServer,proc)	proc onStart(server: HttpServer; cb: proc ())		386
-nim	onShutdown	cps/http/server/types.html#onShutdown,HttpServer,proc)	proc onShutdown(server: HttpServer; cb: proc ())		390
+nim	ByteView	cps/http/server/types.html#ByteView	object ByteView		16
+nim	HttpHeaderView	cps/http/server/types.html#HttpHeaderView	tuple HttpHeaderView		22
+nim	HttpHeadersView	cps/http/server/types.html#HttpHeadersView	object HttpHeadersView		27
+nim	rcNone	cps/http/server/types.html#rcNone	ResponseControl.rcNone		48
+nim	rcPassRoute	cps/http/server/types.html#rcPassRoute	ResponseControl.rcPassRoute		48
+nim	rcContinue	cps/http/server/types.html#rcContinue	ResponseControl.rcContinue		48
+nim	rcHandled	cps/http/server/types.html#rcHandled	ResponseControl.rcHandled		48
+nim	ResponseControl	cps/http/server/types.html#ResponseControl	enum ResponseControl		48
+nim	TemplateRenderer	cps/http/server/types.html#TemplateRenderer	type TemplateRenderer		54
+nim	HttpRequest	cps/http/server/types.html#HttpRequest	object HttpRequest		56
+nim	HttpResponseBuilder	cps/http/server/types.html#HttpResponseBuilder	object HttpResponseBuilder		78
+nim	HttpHandler	cps/http/server/types.html#HttpHandler	type HttpHandler		85
+nim	HttpServerConfig	cps/http/server/types.html#HttpServerConfig	object HttpServerConfig		87
+nim	HttpServer	cps/http/server/types.html#HttpServer	type HttpServer		122
+nim	view	cps/http/server/types.html#view,openArray[char]	proc view(s: openArray[char]): ByteView		134
+nim	view	cps/http/server/types.html#view,openArray[byte]	proc view(bytes: openArray[byte]): ByteView		139
+nim	view	cps/http/server/types.html#view,ptr.UncheckedArray[char],int	proc view(data: ptr UncheckedArray[char]; len: int): ByteView		146
+nim	view	cps/http/server/types.html#view,ptr.UncheckedArray[char],int,int	proc view(data: ptr UncheckedArray[char]; start, len: int): ByteView		151
+nim	toString	cps/http/server/types.html#toString,ByteView	proc toString(v: ByteView): string		159
+nim	`$`	cps/http/server/types.html#$,ByteView	proc `$`(v: ByteView): string		165
+nim	`%`	cps/http/server/types.html#%,ByteView	proc `%`(v: ByteView): JsonNode		169
+nim	`&`	cps/http/server/types.html#&,ByteView,string	proc `&`(a: ByteView; b: string): string		173
+nim	`&`	cps/http/server/types.html#&,string,ByteView	proc `&`(a: string; b: ByteView): string		179
+nim	setMethod	cps/http/server/types.html#setMethod,HttpRequest,sinkstring	proc setMethod(req: var HttpRequest; value: sink string)		185
+nim	setBodyStorage	cps/http/server/types.html#setBodyStorage,HttpRequest,sinkstring	proc setBodyStorage(req: var HttpRequest; value: sink string)		191
+nim	sharedHeaders	cps/http/server/types.html#sharedHeaders,openArray[]	proc sharedHeaders(pairs: openArray[(string, string)]): HttpHeadersView		198
+nim	newOwnedRequest	cps/http/server/types.html#newOwnedRequest,string,string,seq[],string,string,string,string	proc newOwnedRequest(meth, path: string; headers: seq[(string, string)] = @[];\n                body: string = ""; httpVersion: string = "HTTP/1.1";\n                authority: string = ""; scheme: string = ""): HttpRequest		200
+nim	`[]`	cps/http/server/types.html#[],ByteView,int	proc `[]`(v: ByteView; i: int): char		226
+nim	`[]`	cps/http/server/types.html#[],ByteView,BackwardsIndex	proc `[]`(v: ByteView; i: BackwardsIndex): char		230
+nim	`[]`	cps/http/server/types.html#[],ByteView,HSlice[int,int]	proc `[]`(v: ByteView; slice: HSlice[int, int]): ByteView		234
+nim	`[]`	cps/http/server/types.html#[],ByteView,HSlice[int,BackwardsIndex]	proc `[]`(v: ByteView; slice: HSlice[int, BackwardsIndex]): ByteView		241
+nim	items	cps/http/server/types.html#items.i,ByteView	iterator items(v: ByteView): char		249
+nim	pairs	cps/http/server/types.html#pairs.i,ByteView	iterator pairs(v: ByteView): (int, char)		254
+nim	`==`	cps/http/server/types.html#==,ByteView,ByteView	proc `==`(a, b: ByteView): bool		259
+nim	`==`	cps/http/server/types.html#==,ByteView,string	proc `==`(a: ByteView; b: string): bool		266
+nim	`==`	cps/http/server/types.html#==,string,ByteView	proc `==`(a: string; b: ByteView): bool		273
+nim	`!=`	cps/http/server/types.html#!=,ByteView,string	proc `!=`(a: ByteView; b: string): bool		276
+nim	`!=`	cps/http/server/types.html#!=,string,ByteView	proc `!=`(a: string; b: ByteView): bool		279
+nim	cmpIgnoreCase	cps/http/server/types.html#cmpIgnoreCase,ByteView,string	proc cmpIgnoreCase(a: ByteView; b: string): int		283
+nim	eqCaseInsensitive	cps/http/server/types.html#eqCaseInsensitive,ByteView,string	proc eqCaseInsensitive(a: ByteView; b: string): bool		293
+nim	eqCaseInsensitive	cps/http/server/types.html#eqCaseInsensitive,ByteView,ByteView	proc eqCaseInsensitive(a, b: ByteView): bool		297
+nim	startsWith	cps/http/server/types.html#startsWith,ByteView,string	proc startsWith(v: ByteView; prefix: string): bool		304
+nim	find	cps/http/server/types.html#find,ByteView,char,int	proc find(v: ByteView; needle: char; start = 0): int		311
+nim	find	cps/http/server/types.html#find,ByteView,string,int	proc find(v: ByteView; needle: string; start = 0): int		317
+nim	contains	cps/http/server/types.html#contains,ByteView,string	proc contains(v: ByteView; needle: string): bool		332
+nim	hash	cps/http/server/types.html#hash,ByteView	proc hash(v: ByteView): Hash		336
+nim	rawHttp1Headers	cps/http/server/types.html#rawHttp1Headers,ByteView,int	proc rawHttp1Headers(raw: ByteView; count: int): HttpHeadersView		343
+nim	len	cps/http/server/types.html#len,HttpHeadersView	proc len(headers: HttpHeadersView): int		361
+nim	items	cps/http/server/types.html#items.i,HttpHeadersView	iterator items(headers: HttpHeadersView): HttpHeaderView		367
+nim	`[]`	cps/http/server/types.html#[],HttpHeadersView,int	proc `[]`(headers: HttpHeadersView; index: int): HttpHeaderView		400
+nim	newResponse	cps/http/server/types.html#newResponse,int,string,seq[]	proc newResponse(statusCode: int; body: string = "";\n            headers: seq[(string, string)] = @[]): HttpResponseBuilder		408
+nim	newResponse	cps/http/server/types.html#newResponse,int,ByteView,seq[]	proc newResponse(statusCode: int; body: ByteView;\n            headers: seq[(string, string)] = @[]): HttpResponseBuilder		419
+nim	setBody	cps/http/server/types.html#setBody,HttpResponseBuilder,sinkstring	proc setBody(resp: var HttpResponseBuilder; body: sink string)		428
+nim	clearBody	cps/http/server/types.html#clearBody,HttpResponseBuilder	proc clearBody(resp: var HttpResponseBuilder)		433
+nim	passRouteResponse	cps/http/server/types.html#passRouteResponse,seq[]	proc passRouteResponse(headers: seq[(string, string)] = @[]): HttpResponseBuilder		438
+nim	continueResponse	cps/http/server/types.html#continueResponse	proc continueResponse(): HttpResponseBuilder		447
+nim	handledResponse	cps/http/server/types.html#handledResponse	proc handledResponse(): HttpResponseBuilder		456
+nim	eqCaseInsensitive	cps/http/server/types.html#eqCaseInsensitive,string,string	proc eqCaseInsensitive(a, b: string): bool		465
+nim	ensureContext	cps/http/server/types.html#ensureContext,HttpRequest	proc ensureContext(req: var HttpRequest)		472
+nim	getHeader	cps/http/server/types.html#getHeader,HttpRequest,string	proc getHeader(req: HttpRequest; name: string): ByteView		477
+nim	getResponseHeader	cps/http/server/types.html#getResponseHeader,HttpResponseBuilder,string	proc getResponseHeader(resp: HttpResponseBuilder; name: string): string		492
+nim	isValidHeaderName	cps/http/server/types.html#isValidHeaderName,string	proc isValidHeaderName(name: string): bool		502
+nim	isValidHeaderName	cps/http/server/types.html#isValidHeaderName,ByteView	proc isValidHeaderName(name: ByteView): bool		511
+nim	isValidLowercaseHeaderName	cps/http/server/types.html#isValidLowercaseHeaderName,string	proc isValidLowercaseHeaderName(name: string): bool		518
+nim	isValidHeaderValue	cps/http/server/types.html#isValidHeaderValue,string	proc isValidHeaderValue(value: string): bool		527
+nim	isValidHeaderValue	cps/http/server/types.html#isValidHeaderValue,ByteView	proc isValidHeaderValue(value: ByteView): bool		540
+nim	validateHeaderPair	cps/http/server/types.html#validateHeaderPair,ByteView,ByteView	proc validateHeaderPair(name, value: ByteView): bool		548
+nim	validateHeaderPair	cps/http/server/types.html#validateHeaderPair,string,string	proc validateHeaderPair(name, value: string): bool		552
+nim	validateResponseHeaders	cps/http/server/types.html#validateResponseHeaders,seq[]	proc validateResponseHeaders(headers: seq[(string, string)]): bool		556
+nim	isTrustedProxyAddress	cps/http/server/types.html#isTrustedProxyAddress,string,seq[string]	proc isTrustedProxyAddress(ip: string; cidrs: seq[string]): bool		610
+nim	statusMessage	cps/http/server/types.html#statusMessage,int	proc statusMessage(code: int): string		621
+nim	newHttpServer	cps/http/server/types.html#newHttpServer,HttpHandler,string,int,bool,string,string,bool,bool,int,bool,bool,bool,int,uint64,uint64,uint64,uint64,uint64,uint64,int,bool,int,bool,int,int,int,int,int,int,int,int,int,seq[string],bool	proc newHttpServer(handler: HttpHandler; host: string = "127.0.0.1"; port: int = 0;\n              useTls: bool = false; certFile: string = ""; keyFile: string = "";\n              enableHttp2: bool = true; enableHttp3: bool = false;\n              quicIdleTimeoutMs: int = 30000; quicUseRetry: bool = true;\n              quicEnableMigration: bool = true; quicEnableDatagram: bool = true;\n              quicMaxDatagramFrameSize: int = 1200;\n              quicInitialMaxData: uint64 = 1048576'u64;\n              quicInitialMaxStreamDataBidiLocal: uint64 = 262144'u64;\n              quicInitialMaxStreamDataBidiRemote: uint64 = 262144'u64;\n              quicInitialMaxStreamDataUni: uint64 = 262144'u64;\n              quicInitialMaxStreamsBidi: uint64 = 100'u64;\n              quicInitialMaxStreamsUni: uint64 = 100'u64;\n              maxConnections: int = 1000; reusePort: bool = false;\n              deferAcceptSeconds: int = 1; tcpNoDelay: bool = true;\n              initialReadBufferBytes: int = 2048;\n              maxRequestBodySize: int = 10240 * 1024;\n              readTimeoutMs: int = 30000; maxRequestLineSize: int = 8 * 1024;\n              maxHeaderLineSize: int = 8 * 1024;\n              maxHeaderBytes: int = 64 * 1024; maxHeaderCount: int = 100;\n              maxWsFrameBytes: int = 1024 * 1024;\n              maxWsMessageBytes: int = 16384 * 1024;\n              trustedProxyCidrs: seq[string] = @[];\n              trustedForwardedHeaders: bool = false): HttpServer		651
+nim	getPort	cps/http/server/types.html#getPort,HttpServer	proc getPort(server: HttpServer): int		731
+nim	bindAndListen	cps/http/server/types.html#bindAndListen,HttpServer	proc bindAndListen(server: HttpServer)		735
+nim	stop	cps/http/server/types.html#stop,HttpServer	proc stop(server: HttpServer)		753
+nim	onStart	cps/http/server/types.html#onStart,HttpServer,proc)	proc onStart(server: HttpServer; cb: proc ())		761
+nim	onShutdown	cps/http/server/types.html#onShutdown,HttpServer,proc)	proc onShutdown(server: HttpServer; cb: proc ())		765
+nimgrp	==	cps/http/server/types.html#==-procs-all	proc		259
+nimgrp	isvalidheadervalue	cps/http/server/types.html#isValidHeaderValue-procs-all	proc		527
+nimgrp	eqcaseinsensitive	cps/http/server/types.html#eqCaseInsensitive-procs-all	proc		293
+nimgrp	!=	cps/http/server/types.html#!=-procs-all	proc		276
+nimgrp	isvalidheadername	cps/http/server/types.html#isValidHeaderName-procs-all	proc		502
+nimgrp	[]	cps/http/server/types.html#[]-procs-all	proc		226
+nimgrp	&	cps/http/server/types.html#&-procs-all	proc		173
+nimgrp	newresponse	cps/http/server/types.html#newResponse-procs-all	proc		408
+nimgrp	find	cps/http/server/types.html#find-procs-all	proc		311
+nimgrp	validateheaderpair	cps/http/server/types.html#validateHeaderPair-procs-all	proc		548
+nimgrp	view	cps/http/server/types.html#view-procs-all	proc		134
+nimgrp	items	cps/http/server/types.html#items-iterators-all	iterator		249

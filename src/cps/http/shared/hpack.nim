@@ -123,18 +123,23 @@ proc lookup(index: int, dt: DynamicTable): (string, string) =
 # Integer encoding/decoding (RFC 7541 section 5.1)
 # ============================================================
 
-proc encodeInteger*(value: int, prefixBits: int, firstByte: byte): seq[byte] =
-  ## Encode integer into its wire representation.
+proc encodeIntegerInto*(value: int, prefixBits: int, firstByte: byte,
+                        output: var seq[byte]) =
+  ## Append an integer to caller-owned wire storage.
   let maxPrefix = (1 shl prefixBits) - 1
   if value < maxPrefix:
-    result = @[firstByte or byte(value)]
+    output.add firstByte or byte(value)
   else:
-    result = @[firstByte or byte(maxPrefix)]
+    output.add firstByte or byte(maxPrefix)
     var remaining = value - maxPrefix
     while remaining >= 128:
-      result.add byte((remaining and 0x7F) or 0x80)
+      output.add byte((remaining and 0x7F) or 0x80)
       remaining = remaining shr 7
-    result.add byte(remaining)
+    output.add byte(remaining)
+
+proc encodeInteger*(value: int, prefixBits: int, firstByte: byte): seq[byte] =
+  ## Encode integer into newly owned wire storage.
+  encodeIntegerInto(value, prefixBits, firstByte, result)
 
 proc decodeInteger*(data: openArray[byte], offset: var int, prefixBits: int): int =
   ## Decode integer from its wire representation.
@@ -568,6 +573,20 @@ proc encodeString*(s: string, huffman: bool = false): seq[byte] =
   for c in s:
     result.add byte(c)
 
+proc encodeStringInto*(s: string, output: var seq[byte],
+                       huffman: bool = false) =
+  ## Append a string to caller-owned wire storage.
+  if huffman:
+    let encoded = huffmanEncode(s)
+    encodeIntegerInto(encoded.len, 7, 0x80, output)
+    output.add encoded
+    return
+  encodeIntegerInto(s.len, 7, 0x00, output)
+  let oldLen = output.len
+  output.setLen(oldLen + s.len)
+  for i in 0 ..< s.len:
+    output[oldLen + i] = byte(s[i])
+
 proc decodeString*(data: openArray[byte], offset: var int): string =
   ## Decode string from its wire representation.
   let isHuffman = (data[offset] and 0x80) != 0
@@ -608,18 +627,46 @@ proc encodeHeaderInto*(enc: var HpackEncoder, name, value: string,
 
   if exactMatch and staticIdx > 0:
     # Indexed header field (section 6.1)
-    output.add encodeInteger(staticIdx, 7, 0x80)
+    encodeIntegerInto(staticIdx, 7, 0x80, output)
   elif staticIdx > 0:
     # Literal with incremental indexing, indexed name (section 6.2.1)
-    output.add encodeInteger(staticIdx, 6, 0x40)
-    output.add encodeString(value)
+    encodeIntegerInto(staticIdx, 6, 0x40, output)
+    encodeStringInto(value, output)
     enc.dynTable.add(name, value)
   else:
     # Literal with incremental indexing, new name (section 6.2.1)
     output.add 0x40.byte
-    output.add encodeString(name)
-    output.add encodeString(value)
+    encodeStringInto(name, output)
+    encodeStringInto(value, output)
     enc.dynTable.add(name, value)
+
+proc encodeHeaderIntInto*(enc: var HpackEncoder, name: string, value: int,
+                          output: var seq[byte]) =
+  ## Append a non-indexed decimal header without materializing its value.
+  ## Non-indexing is deliberate: it also avoids retaining a one-off decimal
+  ## string in the dynamic table.
+  discard enc
+  let (staticIdx, _) = findInStaticTable(name, "")
+  if staticIdx > 0:
+    encodeIntegerInto(staticIdx, 4, 0x00, output)
+  else:
+    output.add 0x00.byte
+    encodeStringInto(name, output)
+
+  var digits: array[24, byte]
+  var count = 0
+  var remaining = max(0, value)
+  if remaining == 0:
+    digits[0] = byte('0')
+    count = 1
+  else:
+    while remaining > 0:
+      digits[count] = byte(ord('0') + remaining mod 10)
+      remaining = remaining div 10
+      inc count
+  encodeIntegerInto(count, 7, 0x00, output)
+  for i in countdown(count - 1, 0):
+    output.add digits[i]
 
 proc encodeInto*(enc: var HpackEncoder, headers: openArray[(string, string)],
                  output: var seq[byte]) =

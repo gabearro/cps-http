@@ -51,7 +51,7 @@ proc extractHeader*(headerName: string): proc(req: HttpRequest): string =
   ## Key extractor using a specific header value.
   let capturedHeader = headerName
   result = proc(req: HttpRequest): string =
-    req.getHeader(capturedHeader)
+    req.getHeader(capturedHeader).toString()
 
 proc tryConsume(limiter: RateLimiter, key: string): (bool, int) =
   ## Try to consume a token. Returns (allowed, retryAfterSeconds).

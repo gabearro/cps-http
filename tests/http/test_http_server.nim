@@ -37,7 +37,9 @@ proc getListenerPort(listener: TcpListener): int =
 
 proc echoHandler(req: HttpRequest): CpsFuture[HttpResponseBuilder] {.cps.} =
   ## Simple handler: returns the request body as the response body.
-  return newResponse(200, req.body, @[("X-Method", req.meth), ("X-Path", req.path)])
+  return newResponse(200, req.body, @[
+    ("X-Method", req.meth.toString()),
+    ("X-Path", req.path.toString())])
 
 proc helloHandler(req: HttpRequest): CpsFuture[HttpResponseBuilder] {.cps.} =
   ## Handler that returns a fixed greeting.

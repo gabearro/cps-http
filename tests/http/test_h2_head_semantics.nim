@@ -1632,9 +1632,11 @@ block testH2AdapterConcurrentFirstWriteSendsHeadersOnce:
     inc headersSent
     await cpsSleep(1)
 
-  proc sendData(streamId: uint32, data: string): CpsVoidFuture {.cps.} =
+  proc sendData(streamId: uint32, data: pointer,
+                len: int): CpsVoidFuture {.cps.} =
     discard streamId
     discard data
+    discard len
     inc dataWrites
     await cpsSleep(1)
 

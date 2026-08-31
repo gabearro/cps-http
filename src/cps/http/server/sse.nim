@@ -53,7 +53,7 @@ proc initSse*(stream: AsyncStream,
 
   # Check if client accepts gzip
   let aeHeader = req.getHeader("accept-encoding")
-  let useCompression = "gzip" in aeHeader.toLowerAscii
+  let useCompression = "gzip" in aeHeader.toString().toLowerAscii
 
   if stream of Http2StreamAdapter:
     # HTTP/2: send HEADERS frame with SSE headers (no END_STREAM)

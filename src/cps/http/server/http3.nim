@@ -3,6 +3,7 @@
 import std/[strutils, tables]
 import cps/runtime
 import cps/transform
+import cps/quic/varint
 import ../shared/http3
 import ../shared/qpack
 import ../shared/http3_connection
@@ -13,9 +14,9 @@ type
   Http3ProtocolViolation* = object of ValueError
     errorCode*: uint64
 
-  PendingRequestState = object
+  PendingRequestState = ref object
     headers: seq[QpackHeaderField]
-    body: string
+    body: seq[byte]
     sawHeaders: bool
     responseDispatched: bool
     masqueTunnel: bool
@@ -211,14 +212,6 @@ proc validatePseudoHeaders(headers: seq[QpackHeaderField]) =
     if not (hasScheme and hasAuthority and hasPath):
       raiseProtocolViolation(H3ErrMessageError, "HTTP/3 request missing required pseudo headers")
 
-proc appendBytesToString(dst: var string, data: openArray[byte]) =
-  if data.len == 0:
-    return
-  let start = dst.len
-  dst.setLen(start + data.len)
-  for i in 0 ..< data.len:
-    dst[start + i] = char(data[i])
-
 proc fieldSectionSize(headers: openArray[QpackHeaderField]): uint64 =
   for (name, value) in headers:
     let entry = uint64(name.len + value.len + 32)
@@ -289,7 +282,8 @@ proc validateResponseContentLength(headers: openArray[QpackHeaderField], bodyLen
   if hasContentLength and uint64(max(0, bodyLen)) != declaredContentLength:
     raiseProtocolViolation(H3ErrMessageError, "HTTP/3 response body length does not match content-length")
 
-proc buildRequest(streamId: uint64, headers: seq[QpackHeaderField], body: string): HttpRequest =
+proc buildRequest(streamId: uint64, headers: seq[QpackHeaderField],
+                  body: seq[byte]): HttpRequest =
   proc parseContentLengthValue(value: string): uint64 =
     if value.len == 0:
       raiseProtocolViolation(H3ErrMessageError, "HTTP/3 request has invalid content-length value")
@@ -306,45 +300,35 @@ proc buildRequest(streamId: uint64, headers: seq[QpackHeaderField], body: string
     uint64(parsed)
 
   validatePseudoHeaders(headers)
-  var reqHeaders: seq[(string, string)] = @[]
-  var meth = ""
-  var path = ""
-  var authority = ""
-  var scheme = ""
-  var sawContentLength = false
-  var declaredContentLength = 0'u64
-  for (k, v) in headers:
-    case k
-    of ":method": meth = v
-    of ":path": path = v
-    of ":authority": authority = v
-    of ":scheme": scheme = v
-    else:
-      if k == "content-length":
-        let parsed = parseContentLengthValue(v)
-        if sawContentLength and parsed != declaredContentLength:
-          raiseProtocolViolation(H3ErrMessageError, "HTTP/3 request has conflicting content-length values")
-        sawContentLength = true
-        declaredContentLength = parsed
-      reqHeaders.add (k, v)
-  if sawContentLength and uint64(max(0, body.len)) != declaredContentLength:
-    raiseProtocolViolation(H3ErrMessageError, "HTTP/3 request body length does not match content-length")
-  HttpRequest(
-    meth: meth,
-    path: path,
-    httpVersion: "HTTP/3",
-    headers: reqHeaders,
-    body: body,
+  result = HttpRequest(
+    httpVersion: view("HTTP/3"),
+    headers: sharedHeaders(headers),
+    body: view(body),
     remoteAddr: "",
     streamId: uint32(streamId and 0xFFFF_FFFF'u64),
-    authority: authority,
-    scheme: scheme,
     stream: nil,
     reader: nil,
     templateRenderer: nil,
     context: nil,
     appState: nil
   )
+  var sawContentLength = false
+  var declaredContentLength = 0'u64
+  for i in 0 ..< headers.len:
+    case headers[i][0]
+    of ":method": result.meth = view(headers[i][1])
+    of ":path": result.path = view(headers[i][1])
+    of ":authority": result.authority = view(headers[i][1])
+    of ":scheme": result.scheme = view(headers[i][1])
+    else:
+      if headers[i][0] == "content-length":
+        let parsed = parseContentLengthValue(headers[i][1])
+        if sawContentLength and parsed != declaredContentLength:
+          raiseProtocolViolation(H3ErrMessageError, "HTTP/3 request has conflicting content-length values")
+        sawContentLength = true
+        declaredContentLength = parsed
+  if sawContentLength and uint64(max(0, body.len)) != declaredContentLength:
+    raiseProtocolViolation(H3ErrMessageError, "HTTP/3 request body length does not match content-length")
 
 proc buildResponseFrames(session: Http3ServerSession, resp: HttpResponseBuilder): seq[byte] =
   validateResponseStatusCode(resp.statusCode)
@@ -365,7 +349,11 @@ proc buildResponseFrames(session: Http3ServerSession, resp: HttpResponseBuilder)
   # the frame through `add`; a DATA frame can extend that same buffer if needed.
   result = session.conn.encodeHeadersFrame(headers)
   if resp.body.len > 0:
-    result.add encodeDataFrame(resp.body.toOpenArrayByte(0, resp.body.high))
+    result.appendQuicVarInt(H3FrameData)
+    result.appendQuicVarInt(uint64(resp.body.len))
+    let oldLen = result.len
+    result.setLen(oldLen + resp.body.len)
+    copyMem(addr result[oldLen], resp.body.data, resp.body.len)
 
 proc handleHttp3RequestFrames*(session: Http3ServerSession,
                                streamId: uint64,
@@ -424,13 +412,14 @@ proc handleHttp3RequestFrames*(session: Http3ServerSession,
     else:
       PendingRequestState(
         headers: @[],
-        body: "",
+        body: @[],
         sawHeaders: false,
         responseDispatched: false,
         masqueTunnel: false,
         webTransportTunnel: false
       )
-  var events = session.conn.processRequestStreamData(streamId, framePayload)
+  var events = session.conn.processRequestStreamDataOwned(
+    streamId, framePayload)
   if streamEnded:
     let finEvents = session.conn.finalizeRequestStream(streamId)
     if finEvents.len > 0:
@@ -441,7 +430,7 @@ proc handleHttp3RequestFrames*(session: Http3ServerSession,
     let kind = events[i].kind
     if kind == h3evHeaders:
       if not pending.sawHeaders:
-        pending.headers = events[i].headers
+        pending.headers = move(events[i].headers)
         pending.sawHeaders = true
         if hasProtocolPseudoHeader(pending.headers) and not localExtendedConnectEnabled(session):
           if streamId in session.pendingRequests:
@@ -506,7 +495,12 @@ proc handleHttp3RequestFrames*(session: Http3ServerSession,
                 @[("content-type", "text/plain")]
               )
             )
-          appendBytesToString(pending.body, events[i].data)
+          if pending.body.len == 0:
+            # Frame decoding already owns this payload; make it the request
+            # body instead of copying it into another container.
+            pending.body = move(events[i].data)
+          else:
+            pending.body.add events[i].data
     elif kind == h3evProtocolError:
       if streamId in session.pendingRequests:
         session.pendingRequests.del(streamId)
