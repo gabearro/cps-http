@@ -645,10 +645,20 @@ proc processHeaderBlock(headerBlock: ByteView, config: HttpServerConfig,
 
 proc parseRequestPending(stream: AsyncStream, reader: BufferedReader,
                          config: HttpServerConfig,
-                         remoteAddr: string): CpsFuture[ParseRequestResult] {.cps.} =
+                         remoteAddr: string,
+                         initialFill: CpsFuture[bool] = nil): CpsFuture[ParseRequestResult] {.cps.} =
   let maxHeaderSize =
     if config.maxHeaderBytes > 0: config.maxHeaderBytes
     else: 65536
+  if initialFill != nil:
+    try:
+      let filled = await applyReadTimeout(initialFill, config.readTimeoutMs)
+      if not filled:
+        return ParseRequestResult(closeConn: true)
+    except TimeoutError:
+      return ParseRequestResult(statusCode: 408, errBody: "Request Timeout")
+    except CatchableError:
+      return ParseRequestResult(closeConn: true)
   while true:
     let headerEnd = reader.searchHeaderEndOffset()
     if headerEnd >= 0:
@@ -686,21 +696,34 @@ proc parseRequestResultPoll(stream: AsyncStream, reader: BufferedReader,
 
   # Try one sync fill, then check again (common for keep-alive)
   if not reader.atEof():
-    let fillFut = reader.fillBuffer()
-    if fillFut.finished():
-      if not fillFut.hasError():
+    case reader.pollFillBuffer()
+    of bfpData:
+      idx = reader.searchHeaderEndOffset()
+      if idx >= 0:
+        return processHeaderBlockPoll(
+          view(reader.bufferData(), idx), config, stream, reader, remoteAddr, parsed)
+    of bfpEof, bfpError:
+      parsed[] = ParseRequestResult(closeConn: true)
+      return nil
+    of bfpWouldBlock:
+      # Retry once inside the pending parser before allocating a readiness
+      # future. This retains the old path's useful speculative recv without
+      # registering two callbacks for the same descriptor.
+      return parseRequestPending(stream, reader, config, remoteAddr)
+    of bfpUnsupported:
+      let fillFut = reader.fillBuffer()
+      if fillFut.finished():
+        if fillFut.hasError() or not fillFut.read():
+          parsed[] = ParseRequestResult(closeConn: true)
+          return nil
         idx = reader.searchHeaderEndOffset()
         if idx >= 0:
           return processHeaderBlockPoll(
             view(reader.bufferData(), idx), config, stream, reader, remoteAddr, parsed)
-        if reader.atEof():
-          parsed[] = ParseRequestResult(closeConn: true)
-          return nil
       else:
-        parsed[] = ParseRequestResult(closeConn: true)
-        return nil
-    else:
-      return parseRequestPending(stream, reader, config, remoteAddr)
+        # Continue the read already registered by fillBuffer(). Starting
+        # another pending fill would orphan the first future chain.
+        return parseRequestPending(stream, reader, config, remoteAddr, fillFut)
 
   # EOF with no data
   if reader.atEof():

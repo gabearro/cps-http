@@ -39,7 +39,7 @@ proc main() =
   let runtime = newMultiThreadRuntime()
   setMainRuntime(runtime)
   setCurrentRuntime(runtime)
-  runtime.startMtIoShards(startShard)
+  runtime.startMtNetworkShards(startShard)
   while true:
     sleep(1000)
 
