@@ -706,10 +706,10 @@ proc parseRequestResultPoll(stream: AsyncStream, reader: BufferedReader,
       parsed[] = ParseRequestResult(closeConn: true)
       return nil
     of bfpWouldBlock:
-      # Retry once inside the pending parser before allocating a readiness
-      # future. This retains the old path's useful speculative recv without
-      # registering two callbacks for the same descriptor.
-      return parseRequestPending(stream, reader, config, remoteAddr)
+      # The non-blocking read already established EAGAIN. Arm readiness
+      # directly instead of repeating the same syscall in fillBuffer().
+      return parseRequestPending(stream, reader, config, remoteAddr,
+        reader.waitFillBuffer())
     of bfpUnsupported:
       let fillFut = reader.fillBuffer()
       if fillFut.finished():
